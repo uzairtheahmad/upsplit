@@ -115,6 +115,56 @@ export function recentMonthKeys(count: number, now: Date = new Date()): string[]
   )
 }
 
+/**
+ * The month keys a range covers, oldest first.
+ *
+ * The monthly chart used a fixed "last 6 months" regardless of the range
+ * selected above it, which reads as a bug the moment someone picks a custom
+ * range and the bars do not move.
+ *
+ * Counts in whole months rather than stepping a Date forward. Stepping drifts:
+ * if a month boundary lands on a DST transition at midnight the Date shifts by
+ * an hour, the shift persists through every later addMonths(), and the final
+ * month is then "after" the end and silently dropped. Arithmetic on
+ * year * 12 + month has no such failure mode.
+ *
+ * Capped at 24 bars, keeping the most recent. "All time", or a custom range
+ * spanning years, would otherwise produce hundreds of unreadable columns.
+ */
+export function monthKeysForRange(range: DateRange | null, fallback = 6): string[] {
+  if (!range) return recentMonthKeys(fallback)
+
+  const first = monthIndex(range.from)
+  const last = monthIndex(range.to)
+
+  // Unparseable, or inverted: no months. The caller shows an empty state
+  // rather than silently swapping the two dates.
+  if (first === null || last === null || first > last) return []
+
+  const keys: string[] = []
+  for (let index = Math.max(first, last - (MAX_MONTH_COLUMNS - 1)); index <= last; index += 1) {
+    const year = Math.floor(index / 12)
+    const month = (index % 12) + 1
+    keys.push(`${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}`)
+  }
+
+  return keys
+}
+
+/** An ISO date as a count of months since year zero, or null if unparseable. */
+function monthIndex(isoDate: string): number | null {
+  const match = /^(\d{4})-(\d{2})/.exec(isoDate)
+  if (!match) return null
+
+  const year = Number(match[1])
+  const month = Number(match[2])
+  if (month < 1 || month > 12) return null
+
+  return year * 12 + (month - 1)
+}
+
+const MAX_MONTH_COLUMNS = 24
+
 export function monthKeyLabel(key: string): string {
   return format(parseISO(`${key}-01`), 'MMM yyyy')
 }

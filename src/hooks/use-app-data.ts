@@ -105,6 +105,9 @@ export function useMyRole(groupId: string | undefined) {
   return {
     role,
     isOwner: role === 'owner',
+    /** Anyone in the group may bring someone in. Removing is another matter. */
+    canInvite: role !== undefined,
+    /** Removing people, changing roles, and the shareable link. */
     canManageMembers: role === 'owner' || role === 'admin',
     canManageGroup: role === 'owner',
   }

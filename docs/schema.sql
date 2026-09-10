@@ -922,8 +922,13 @@ declare
   v_inviter  text;
   v_token    text;
 begin
-  if not public.can_manage_members(p_group_id) then
-    raise exception 'Only owners and admins can invite people' using errcode = '42501';
+  -- Any member may invite. A shared-expense group is a group of people who
+  -- already know each other, and making everyone wait on an admin to add the
+  -- friend who just joined the trip is friction with no safety benefit:
+  -- whoever is invited sees the same ledger either way. Removing people is
+  -- still admin-only, because that one is destructive.
+  if not public.is_group_member(p_group_id) then
+    raise exception 'Only people in this group can invite others' using errcode = '42501';
   end if;
 
   if v_email !~ '^[^@[:space:]]+@[^@[:space:]]+[.][^@[:space:]]+$' then
@@ -2120,10 +2125,14 @@ create policy group_members_select on public.group_members
 create policy group_members_insert on public.group_members
   for insert to authenticated
   with check (
-    -- Owners and admins may add people. The very first row (the creator
-    -- becoming owner) is inserted by a SECURITY DEFINER trigger, which is not
-    -- subject to this policy.
+    -- Owners and admins may add anyone, at any role.
     public.can_manage_members(group_id)
+    -- Any member may add someone, but only as a `member`. The role check is
+    -- load-bearing: without it a plain member could insert an `owner` row,
+    -- which either collides with the single-owner index or hands out admin.
+    or (public.is_group_member(group_id) and role = 'member')
+    -- The very first row (the creator becoming owner) is inserted by a
+    -- SECURITY DEFINER trigger, which is not subject to this policy.
   );
 
 create policy group_members_update on public.group_members

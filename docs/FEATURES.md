@@ -65,7 +65,7 @@ the split.
 | ✅ Auth | Sign up, log in, password reset, change password. Email confirmation on. |
 | ✅ Route protection | Middleware, using `getUser()` (not `getSession()`, which trusts a forgeable cookie). |
 | ✅ Groups | Create, rename, icon, colour, archive, restore, delete. |
-| ✅ Roles | `owner` / `admin` / `member`. Exactly one owner per group. |
+| ✅ Roles | `owner` / `admin` / `member`. Exactly one owner per group. **Any member can invite**; removing people, changing roles and the shareable link stay owner/admin. The RLS insert policy lets a plain member add someone only at role `member`, so nobody can mint an owner. |
 | ✅ Members | Add, change role, remove. Removal refuses if the member's net is non-zero. |
 | ✅ Email invitations | Invite by **email only**, no name is asked for; the name comes from the account. Someone with an account joins immediately. Someone without produces a 14-day token, and the dialog hands the inviter a `/invite/[token]` link to send: a public page naming the group and who invited them. Signing up with the invited address claims the invitation automatically; anyone else can accept the token explicitly. |
 | ✅ Expenses | Equal and exact splits, multiple payers, payer-who-isn't-a-participant, notes, category, date. |

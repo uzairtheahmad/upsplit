@@ -37,8 +37,8 @@ const ROLE_LABELS: Record<GroupRole, string> = {
 
 const ROLE_DESCRIPTIONS: Record<GroupRole, string> = {
   owner: 'Full control, including group settings and deletion.',
-  admin: 'Can manage members and every expense.',
-  member: 'Can add expenses and record settlements.',
+  admin: 'Can remove members, change roles, and edit every expense.',
+  member: 'Can invite people, add expenses, and record settlements.',
 }
 
 export default function GroupMembersPage() {
@@ -100,14 +100,16 @@ export default function GroupMembersPage() {
         title={`${ledger.members.length} members`}
         description={
           permissions.canManageMembers
-            ? 'You can invite people and change roles in this group.'
-            : 'Only owners and admins can manage members.'
+            ? 'Anyone here can invite people. You can also change roles and remove members.'
+            : 'You can invite people. Only owners and admins can change roles or remove members.'
         }
         action={
-          <Button size="sm" onClick={() => actions.inviteMember(groupId)}>
-            <UserPlus aria-hidden />
-            Invite
-          </Button>
+          permissions.canInvite ? (
+            <Button size="sm" onClick={() => actions.inviteMember(groupId)}>
+              <UserPlus aria-hidden />
+              Invite
+            </Button>
+          ) : null
         }
       />
 

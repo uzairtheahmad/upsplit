@@ -12,6 +12,7 @@ import { PageContainer, PageHeader } from '@/components/shared/page-header'
 import { ChartSkeleton, EmptyState } from '@/components/shared/states'
 import { UserAvatar } from '@/components/ui/avatar'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 import { Progress } from '@/components/ui/misc'
 import {
   Select,
@@ -36,8 +37,9 @@ import { formatMoney } from '@/lib/money/money'
 import {
   DATE_RANGE_LABELS,
   friendlyDate,
-  recentMonthKeys,
+  monthKeysForRange,
   resolveDateRange,
+  toISODate,
   type DateRangeKey,
 } from '@/lib/utils/dates'
 
@@ -54,6 +56,13 @@ export default function AnalyticsPage() {
   const [rangeKey, setRangeKey] = React.useState<DateRangeKey>('last_6_months')
   const [groupId, setGroupId] = React.useState<string>('all')
 
+  // Seeded to the six months the page opens on, so switching to Custom starts
+  // from what is already on screen rather than from nothing.
+  const [custom, setCustom] = React.useState(() => {
+    const seeded = resolveDateRange('last_6_months')
+    return { from: seeded?.from ?? '', to: seeded?.to ?? toISODate(new Date()) }
+  })
+
   const currency = groups[0]?.currency ?? 'PKR'
 
   const scoped = React.useMemo(
@@ -61,12 +70,27 @@ export default function AnalyticsPage() {
     [allExpenses, groupId],
   )
 
-  const range = resolveDateRange(rangeKey)
+  const customIncomplete = !custom.from || !custom.to
+  const customInverted = !customIncomplete && custom.from > custom.to
+  const customUsable = rangeKey === 'custom' && !customIncomplete && !customInverted
+
+  const range =
+    rangeKey === 'custom'
+      ? customUsable
+        ? { from: custom.from, to: custom.to }
+        : // Half-filled or back-to-front: match nothing rather than silently
+          // widening to every expense ever recorded.
+          { from: '9999-12-31', to: '0001-01-01' }
+      : resolveDateRange(rangeKey)
+
   const expenses = filterExpensesByRange(scoped, range)
 
   const total = totalSpending(expenses)
   const categories = spendingByCategory(expenses)
-  const months = spendingByMonth(scoped, recentMonthKeys(6))
+  // The chart follows the range above it. Scoped, not filtered: the month
+  // buckets do the narrowing, and passing pre-filtered expenses would drop
+  // partial months at the edges.
+  const months = spendingByMonth(scoped, monthKeysForRange(range))
   const spenders = topSpenders(expenses)
   const largest = largestExpenses(expenses, 5)
   const average = averageExpense(expenses)
@@ -108,25 +132,65 @@ export default function AnalyticsPage() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {(Object.keys(DATE_RANGE_LABELS) as DateRangeKey[])
-                  .filter((key) => key !== 'custom')
-                  .map((key) => (
-                    <SelectItem key={key} value={key}>
-                      {DATE_RANGE_LABELS[key]}
-                    </SelectItem>
-                  ))}
+                {(Object.keys(DATE_RANGE_LABELS) as DateRangeKey[]).map((key) => (
+                  <SelectItem key={key} value={key}>
+                    {DATE_RANGE_LABELS[key]}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
+
+            {rangeKey === 'custom' ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <Input
+                  type="date"
+                  value={custom.from}
+                  max={custom.to || undefined}
+                  onChange={(event) =>
+                    setCustom((previous) => ({ ...previous, from: event.target.value }))
+                  }
+                  aria-label="From date"
+                  className="w-auto"
+                />
+                <span className="text-sm text-muted-foreground" aria-hidden>
+                  to
+                </span>
+                <Input
+                  type="date"
+                  value={custom.to}
+                  min={custom.from || undefined}
+                  onChange={(event) =>
+                    setCustom((previous) => ({ ...previous, to: event.target.value }))
+                  }
+                  aria-label="To date"
+                  className="w-auto"
+                />
+              </div>
+            ) : null}
           </div>
         }
       />
+
+      {rangeKey === 'custom' && (customIncomplete || customInverted) ? (
+        <p role="alert" className="text-sm text-destructive">
+          {customInverted
+            ? 'The start date is after the end date, so nothing falls inside it.'
+            : 'Pick both a start and an end date to see this range.'}
+        </p>
+      ) : null}
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <BalanceCard
           label="Total spending"
           icon={Wallet}
           value={<Amount value={total} currency={currency} size="2xl" />}
-          detail={DATE_RANGE_LABELS[rangeKey].toLowerCase()}
+          detail={
+            rangeKey === 'custom'
+              ? customUsable
+                ? `${friendlyDate(custom.from)} to ${friendlyDate(custom.to)}`
+                : 'pick a start and an end date'
+              : DATE_RANGE_LABELS[rangeKey].toLowerCase()
+          }
         />
         <BalanceCard
           label="Expenses"
@@ -165,8 +229,16 @@ export default function AnalyticsPage() {
       {expenses.length === 0 ? (
         <EmptyState
           icon={Receipt}
-          title="Nothing in this range"
-          description="Try a wider date range, or add some expenses to see the breakdown."
+          title={
+            rangeKey === 'custom' && (customIncomplete || customInverted)
+              ? 'Choose a date range'
+              : 'Nothing in this range'
+          }
+          description={
+            rangeKey === 'custom' && (customIncomplete || customInverted)
+              ? 'Set a start and an end date above to see the breakdown.'
+              : 'Try a wider date range, or add some expenses to see the breakdown.'
+          }
         />
       ) : (
         <>
