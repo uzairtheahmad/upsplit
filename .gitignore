@@ -4,4 +4,8 @@ out
 .DS_Store
 *.tsbuildinfo
 next-env.d.ts
+
+# Real credentials never get committed. The template does, or a fresh clone
+# has nothing to copy from.
 .env*
+!.env.local.example
