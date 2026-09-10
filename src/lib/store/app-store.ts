@@ -56,9 +56,6 @@ export interface AppState {
 
 const EMPTY_PREFERENCES: UserPreferences = {
   defaultCurrency: 'PKR',
-  emailNotifications: true,
-  pushNotifications: false,
-  weeklySummary: true,
 }
 
 function emptyState() {

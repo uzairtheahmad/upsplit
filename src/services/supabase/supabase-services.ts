@@ -108,22 +108,6 @@ async function fetchGroup(id: string): Promise<Group> {
   return toGroup(data as GroupRow)
 }
 
-/**
- * Asks the server to send whatever is queued in the email outbox.
- *
- * Deliberately fire-and-forget. The mail is already durably queued by the time
- * this runs, so a failure here delays delivery until the next scheduled run
- * rather than losing anything. Blocking an invite on an SMTP round trip would
- * trade a guarantee for a spinner.
- */
-async function flushEmailOutbox(): Promise<void> {
-  try {
-    await fetch('/api/email/dispatch', { method: 'POST' })
-  } catch {
-    // Offline, or the route is not deployed. The queue keeps the message.
-  }
-}
-
 export const supabaseServices: DataServices = {
   groups: {
     async list() {
@@ -240,14 +224,6 @@ export const supabaseServices: DataServices = {
         | { status: 'already_member'; user_id: string }
         | { status: 'added'; user_id: string; email: string }
         | { status: 'pending'; email: string; token: string; group_name: string }
-
-      // The RPC queued the mail inside its own transaction. Push it out now
-      // rather than waiting for the schedule, so an invitation lands while the
-      // person who sent it is still looking at the screen. Failures stay in
-      // the outbox for the scheduled run to retry, so this is allowed to lose.
-      if (result.status !== 'already_member') {
-        void flushEmailOutbox()
-      }
 
       // Nobody joined a group, so there is nothing new to load.
       if (result.status === 'pending') {
@@ -662,10 +638,6 @@ export const supabaseServices: DataServices = {
     async updatePreferences(input) {
       const patch: Record<string, unknown> = {}
       if (input.defaultCurrency !== undefined) patch.default_currency = input.defaultCurrency
-      if (input.emailNotifications !== undefined)
-        patch.email_notifications = input.emailNotifications
-      if (input.pushNotifications !== undefined) patch.push_notifications = input.pushNotifications
-      if (input.weeklySummary !== undefined) patch.weekly_summary = input.weeklySummary
 
       const row = check(
         await db().from('profiles').update(patch).eq('id', currentUserId()).select('*').single(),

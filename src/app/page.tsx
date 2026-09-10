@@ -241,6 +241,12 @@ export default function LandingPage() {
             <Link href="/signup" className="hover:text-foreground">
               Get started
             </Link>
+            <Link href="/terms" className="hover:text-foreground">
+              Terms
+            </Link>
+            <Link href="/privacy" className="hover:text-foreground">
+              Privacy
+            </Link>
             <a
               href={GITHUB_URL}
               target="_blank"

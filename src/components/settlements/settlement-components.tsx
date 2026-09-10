@@ -4,6 +4,7 @@ import { ArrowRight, CheckCircle2, Handshake, Sparkles, Trash2 } from 'lucide-re
 import { toast } from 'sonner'
 
 import { Amount } from '@/components/shared/money'
+import { useBlockedDialog } from '@/components/shared/blocked-dialog'
 import { EmptyState } from '@/components/shared/states'
 import { UserAvatar } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -143,6 +144,9 @@ export function SettlementList({
   currentUserId: string
   showGroup?: boolean
 }) {
+  // Hook first: the empty state below is an early return.
+  const { show, dialog } = useBlockedDialog()
+
   if (settlements.length === 0) {
     return (
       <EmptyState
@@ -161,9 +165,11 @@ export function SettlementList({
       await services.settlements.remove(settlement.id)
       toast.success('Settlement removed', { description: 'Balances have been restored.' })
     } catch (error) {
-      toast.error('Could not remove it', {
-        description: error instanceof Error ? error.message : 'Please try again.',
-      })
+      show(
+        'Could not undo that settlement',
+        error,
+        'Only the person who recorded a settlement, or a group admin, can undo it.',
+      )
     }
   }
 
@@ -218,6 +224,7 @@ export function SettlementList({
           </li>
         )
       })}
+      {dialog}
     </ul>
   )
 }

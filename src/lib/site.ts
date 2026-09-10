@@ -27,3 +27,20 @@ export function siteUrl(): string {
 
   return PRODUCTION_URL
 }
+
+/**
+ * Validates a `?next=` destination.
+ *
+ * Middleware sets it when it bounces someone, and an invitation link sets it
+ * so the recipient lands back on the invitation rather than a bare dashboard.
+ * Only a same-site absolute path is accepted: a full URL, or the
+ * protocol-relative "//evil.com", would turn a sign-in into an open redirect.
+ *
+ * Lives here rather than beside the auth forms because a `'use client'` module
+ * cannot export a function the server is allowed to call, and the auth pages
+ * read the query on the server so their routes still prerender.
+ */
+export function safeNext(next: string | null | undefined): string {
+  if (!next || !next.startsWith('/') || next.startsWith('//')) return '/dashboard'
+  return next
+}

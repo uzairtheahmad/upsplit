@@ -143,33 +143,18 @@ machine.
 
 ## Email
 
-Every message is queued into `email_outbox` by the database, inside the same
-transaction as the thing that caused it. A write RPC cannot hold its
-transaction open across an HTTP call, and an inline send that failed would
-vanish with nothing to retry.
+There isn't any. UpSplit sends no mail of its own: `email_outbox`,
+`queue_email()` and the dispatch route are gone, and `notify_user()` writes an
+in-app notification only.
 
-`POST /api/email/dispatch` drains the queue. Two callers are allowed: the app
-itself right after an invite, so the mail arrives in seconds, and a daily cron
-carrying `CRON_SECRET`, which retries anything that failed. The run is
-idempotent and returns only counts.
+Outgoing mail needs a verified sending domain. Rather than keep a path that
+silently queued messages nobody would receive, it was removed. Supabase still
+sends what sign-in requires (confirmation, password reset); that is its own
+system and unaffected.
 
-Draining needs `SUPABASE_SERVICE_ROLE_KEY`, because `email_outbox` has RLS
-enabled and **no policy at all**. Queued mail is other people's private
-notification text, so nothing signed in should be able to read it.
-
-Two details worth keeping:
-
-- The attempt counter is incremented **before** the send, not after. If the
-  function is killed mid-send by a serverless timeout, the row must not look
-  untouched, or a slow message gets delivered on every subsequent run.
-- A 4xx from the provider is not retried. The request itself is wrong (bad key,
-  unverified domain, malformed address) and retrying sends the same broken
-  request again. Only 429 and 5xx are retried.
-
-`queue_email()` is the one function in the schema that `authenticated` may not
-execute. The schema sets `alter default privileges ... grant all on functions`,
-so without an explicit revoke any signed-in user could send arbitrary mail from
-your domain.
+To add it back later: `notify_user()` is the single choke point every
+notification already flows through, so a queue table plus a drainer reattaches
+there without touching any caller.
 
 ## Invitations
 
@@ -181,11 +166,17 @@ Two separate mechanisms, easy to confuse:
 | Lifetime | One live link per group, rotatable | One per address per group, 14 days |
 | Lands on | `/join/[token]`, sign-in required | `/invite/[token]`, public |
 
-The email path is public because the recipient has no account yet. Bouncing
+The tokened path is public because the recipient has no account yet. Bouncing
 them to `/login` would show a stranger a sign-in form with no explanation of
 what they were invited to. `invitation_preview()` is granted to `anon` and
 returns only the group's name, who invited them, and how many people are in it.
 No member list, no other addresses, no amounts.
+
+Since nothing is emailed, `invite_to_group()` returns the token to the caller
+and the invite dialog shows the link for the inviter to send. The token column
+is not readable by clients at all: table-level SELECT is revoked and the other
+columns granted back, so a plain member cannot lift a token for a group they
+have no right to invite anyone into.
 
 Accepting is a button, never an effect that fires on load. Joining a group
 changes someone's account, and a link in an email can be followed by accident
@@ -206,8 +197,16 @@ permits.
 which is the single most important guarantee in the schema.
 
 The anon key is designed to be public. RLS is what protects the data, not the
-secrecy of the key. `SUPABASE_SERVICE_ROLE_KEY` bypasses every policy, so it is
-server-only and must never get a `NEXT_PUBLIC_` prefix.
+secrecy of the key. Nothing in the app uses `SUPABASE_SERVICE_ROLE_KEY` any
+more, so it does not need to exist in the deployment at all: draining the email
+outbox was its only caller.
+
+A note on guards, because this cost a real vulnerability once.
+`group_role_of()` returns NULL for a non-member, and in PL/pgSQL
+`if not NULL then` does **not** take the branch. `can_manage_members()`
+therefore coalesces to false, and role comparisons use `is distinct from`
+rather than `<>`. RLS policies are safe from this either way, since a NULL
+`USING` expression filters the row, but a plpgsql guard is not a policy.
 
 ## Design system
 

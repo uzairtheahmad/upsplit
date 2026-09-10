@@ -1,6 +1,8 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+import { safeNext } from '@/lib/site'
+
 import { supabaseAnonKey, supabaseUrl } from './env'
 
 /**
@@ -11,12 +13,19 @@ import { supabaseAnonKey, supabaseUrl } from './env'
  * stranger a sign-in form with no explanation of what they were invited to.
  * The page itself reveals only the group's name and who invited them.
  *
- * `/api` is listed because a redirect is the wrong answer to an API call: a
- * scheduler or a fetch() gets a 307 to an HTML sign-in page instead of a
- * status code it can act on. Every route under /api therefore does its own
- * authorisation. If you add one, that is now your job.
+ * `/terms` and `/privacy` are public because the signup form links to them:
+ * being asked to accept terms you cannot read without an account would be
+ * absurd.
  */
-const PUBLIC_ROUTES = ['/login', '/signup', '/forgot-password', '/auth', '/invite', '/api']
+const PUBLIC_ROUTES = [
+  '/login',
+  '/signup',
+  '/forgot-password',
+  '/auth',
+  '/invite',
+  '/terms',
+  '/privacy',
+]
 
 function isPublic(pathname: string): boolean {
   return pathname === '/' || PUBLIC_ROUTES.some((route) => pathname.startsWith(route))
@@ -87,12 +96,7 @@ export async function updateSession(request: NextRequest) {
     // Honour ?next= so somebody who followed an invitation link and happened
     // to be signed in already still lands on the invitation rather than being
     // dumped on the dashboard with no idea what happened.
-    // A single leading slash only: "//evil.com" also starts with "/", and
-    // while assigning to .pathname keeps the origin, refusing it here means
-    // the rule does not depend on that subtlety staying true.
-    const next = request.nextUrl.searchParams.get('next')
-    const safe = next && next.startsWith('/') && !next.startsWith('//')
-    url.pathname = safe ? next : '/dashboard'
+    url.pathname = safeNext(request.nextUrl.searchParams.get('next'))
     url.search = ''
     return NextResponse.redirect(url)
   }

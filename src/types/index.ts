@@ -226,7 +226,4 @@ export interface AppNotification {
 
 export interface UserPreferences {
   defaultCurrency: CurrencyCode
-  emailNotifications: boolean
-  pushNotifications: boolean
-  weeklySummary: boolean
 }

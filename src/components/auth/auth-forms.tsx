@@ -2,7 +2,7 @@
 
 import { CheckCircle2, Eye, EyeOff } from 'lucide-react'
 import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import * as React from 'react'
 import { toast } from 'sonner'
 
@@ -21,20 +21,6 @@ import { createClient } from '@/lib/supabase/client'
  */
 
 const EMAIL_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
-
-/**
- * Where to go after authenticating.
- *
- * Middleware sets ?next when it bounces someone, and an invitation link sets
- * it so the recipient lands back on the invitation instead of a bare
- * dashboard. Only a same-site path is accepted: a full URL, or the
- * protocol-relative "//evil.com", would turn this into an open redirect.
- */
-function safeNext(params: URLSearchParams | null): string {
-  const next = params?.get('next')
-  if (!next || !next.startsWith('/') || next.startsWith('//')) return '/dashboard'
-  return next
-}
 
 function PasswordInput({
   id,
@@ -77,9 +63,91 @@ function PasswordInput({
   )
 }
 
-export function LoginForm() {
+/**
+ * Google sign-in.
+ *
+ * Shared by both forms, because "log in" and "sign up" are the same operation
+ * to an OAuth provider: Google decides whether the account exists, and
+ * Supabase creates a profile the first time either way.
+ *
+ * The redirect goes to /auth/callback, which exchanges the one-time code for a
+ * session and then honours `next`. That route already validates `next` as a
+ * relative path, so an invitation link survives the round trip without opening
+ * a redirect hole.
+ */
+function GoogleButton({ next, label }: { next: string; label: string }) {
+  const [loading, setLoading] = React.useState(false)
+
+  async function handleClick() {
+    setLoading(true)
+    const supabase = createClient()
+    const callback = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`
+
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: callback },
+    })
+
+    // On success the browser is already navigating to Google, so the spinner
+    // is only ever cleared on failure.
+    if (error) {
+      setLoading(false)
+      toast.error('Could not continue with Google', { description: error.message })
+    }
+  }
+
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="lg"
+      className="w-full"
+      loading={loading}
+      onClick={handleClick}
+    >
+      {loading ? null : <GoogleIcon />}
+      {label}
+    </Button>
+  )
+}
+
+/** Google's mark. Inline because the CSP blocks external images. */
+function GoogleIcon() {
+  return (
+    <svg viewBox="0 0 18 18" className="size-4" aria-hidden focusable="false">
+      <path
+        fill="#4285F4"
+        d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62Z"
+      />
+      <path
+        fill="#34A853"
+        d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.02-3.7H.96v2.34A9 9 0 0 0 9 18Z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M3.98 10.72a5.4 5.4 0 0 1 0-3.44V4.94H.96a9 9 0 0 0 0 8.12l3.02-2.34Z"
+      />
+      <path
+        fill="#EA4335"
+        d="M9 3.58c1.32 0 2.5.46 3.44 1.35l2.58-2.58C13.46.9 11.43 0 9 0A9 9 0 0 0 .96 4.94l3.02 2.34C4.68 5.16 6.66 3.58 9 3.58Z"
+      />
+    </svg>
+  )
+}
+
+/** A labelled rule, so the two ways in read as alternatives. */
+function OrDivider() {
+  return (
+    <div className="flex items-center gap-3">
+      <span className="h-px flex-1 bg-border" />
+      <span className="text-xs text-muted-foreground">or</span>
+      <span className="h-px flex-1 bg-border" />
+    </div>
+  )
+}
+
+export function LoginForm({ next = '/dashboard' }: { next?: string }) {
   const router = useRouter()
-  const searchParams = useSearchParams()
 
   const [email, setEmail] = React.useState('')
   const [password, setPassword] = React.useState('')
@@ -89,11 +157,11 @@ export function LoginForm() {
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
-    const next: typeof errors = {}
-    if (!EMAIL_PATTERN.test(email.trim())) next.email = 'Enter a valid email address'
-    if (password.length < 8) next.password = 'Passwords are at least 8 characters'
-    setErrors(next)
-    if (Object.keys(next).length > 0) return
+    const found: typeof errors = {}
+    if (!EMAIL_PATTERN.test(email.trim())) found.email = 'Enter a valid email address'
+    if (password.length < 8) found.password = 'Passwords are at least 8 characters'
+    setErrors(found)
+    if (Object.keys(found).length > 0) return
 
     setLoading(true)
     const supabase = createClient()
@@ -111,7 +179,7 @@ export function LoginForm() {
     toast.success('Welcome back')
     // Middleware set ?next when it bounced an unauthenticated visitor, so
     // signing in returns them to the page they actually asked for.
-    router.replace(safeNext(searchParams))
+    router.replace(next)
     router.refresh()
   }
 
@@ -121,6 +189,10 @@ export function LoginForm() {
         <h1 className="text-2xl font-semibold tracking-tight">Welcome back</h1>
         <p className="text-sm text-muted-foreground">Log in to pick up where you left off.</p>
       </header>
+
+      <GoogleButton next={next} label="Continue with Google" />
+
+      <OrDivider />
 
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
         <Field label="Email" htmlFor="login-email" error={errors.email}>
@@ -177,7 +249,7 @@ export function LoginForm() {
       <p className="text-center text-sm text-muted-foreground">
         New here?{' '}
         <Link
-          href={`/signup?next=${encodeURIComponent(safeNext(searchParams))}`}
+          href={`/signup?next=${encodeURIComponent(next)}`}
           className="font-medium text-primary underline-offset-4 hover:underline"
         >
           Create an account
@@ -187,15 +259,22 @@ export function LoginForm() {
   )
 }
 
-export function SignupForm() {
+export function SignupForm({
+  next = '/dashboard',
+  invitedEmail = '',
+}: {
+  next?: string
+  /**
+   * The address an invitation was sent to. Prefilled so the person does not
+   * retype it, and so they sign up with the address the pending invitation is
+   * filed under.
+   */
+  invitedEmail?: string
+}) {
   const router = useRouter()
-  const searchParams = useSearchParams()
 
   const [name, setName] = React.useState('')
-  // An invitation link carries the address it was sent to, so the person does
-  // not have to retype it, and so they sign up with the address the pending
-  // invitation is filed under.
-  const [email, setEmail] = React.useState(() => searchParams.get('email') ?? '')
+  const [email, setEmail] = React.useState(invitedEmail)
   const [password, setPassword] = React.useState('')
   const [confirm, setConfirm] = React.useState('')
   const [accepted, setAccepted] = React.useState(false)
@@ -204,14 +283,14 @@ export function SignupForm() {
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
-    const next: Record<string, string> = {}
-    if (name.trim().length < 2) next.name = 'Enter your full name'
-    if (!EMAIL_PATTERN.test(email.trim())) next.email = 'Enter a valid email address'
-    if (password.length < 8) next.password = 'Use at least 8 characters'
-    if (confirm !== password) next.confirm = 'Passwords don’t match'
-    if (!accepted) next.terms = 'Please accept the terms to continue'
-    setErrors(next)
-    if (Object.keys(next).length > 0) return
+    const found: Record<string, string> = {}
+    if (name.trim().length < 2) found.name = 'Enter your full name'
+    if (!EMAIL_PATTERN.test(email.trim())) found.email = 'Enter a valid email address'
+    if (password.length < 8) found.password = 'Use at least 8 characters'
+    if (confirm !== password) found.confirm = 'Passwords don’t match'
+    if (!accepted) found.terms = 'Please accept the terms to continue'
+    setErrors(found)
+    if (Object.keys(found).length > 0) return
 
     setLoading(true)
     const supabase = createClient()
@@ -229,8 +308,6 @@ export function SignupForm() {
       return
     }
 
-    const destination = safeNext(searchParams)
-
     // With email confirmation on, signUp returns a user but no session.
     if (!data.session) {
       setLoading(false)
@@ -239,12 +316,12 @@ export function SignupForm() {
       })
       // Carry the destination through, so confirming and then logging in still
       // ends on the invitation they were following.
-      router.push(`/login?next=${encodeURIComponent(destination)}`)
+      router.push(`/login?next=${encodeURIComponent(next)}`)
       return
     }
 
     toast.success('Account created', { description: 'Welcome to UpSplit.' })
-    router.replace(destination)
+    router.replace(next)
     router.refresh()
   }
 
@@ -256,6 +333,10 @@ export function SignupForm() {
           Start tracking shared expenses in under a minute.
         </p>
       </header>
+
+      <GoogleButton next={next} label="Sign up with Google" />
+
+      <OrDivider />
 
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
         <Field label="Full name" htmlFor="signup-name" error={errors.name}>
@@ -317,8 +398,22 @@ export function SignupForm() {
             />
             <span className="text-muted-foreground">
               I agree to the{' '}
-              <span className="font-medium text-foreground">Terms of Service</span> and{' '}
-              <span className="font-medium text-foreground">Privacy Policy</span>.
+              <Link
+                href="/terms"
+                target="_blank"
+                className="font-medium text-foreground underline underline-offset-4"
+              >
+                Terms of Service
+              </Link>{' '}
+              and{' '}
+              <Link
+                href="/privacy"
+                target="_blank"
+                className="font-medium text-foreground underline underline-offset-4"
+              >
+                Privacy Policy
+              </Link>
+              .
             </span>
           </label>
           {errors.terms ? (
@@ -336,7 +431,7 @@ export function SignupForm() {
       <p className="text-center text-sm text-muted-foreground">
         Already have an account?{' '}
         <Link
-          href={`/login?next=${encodeURIComponent(safeNext(searchParams))}`}
+          href={`/login?next=${encodeURIComponent(next)}`}
           className="font-medium text-primary underline-offset-4 hover:underline"
         >
           Log in

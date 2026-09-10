@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 
 import { InviteLinkPanel } from '@/components/groups/invite-link-panel'
 import { useAppActions } from '@/components/layout/app-actions'
+import { useBlockedDialog } from '@/components/shared/blocked-dialog'
 import { Amount } from '@/components/shared/money'
 import { SectionHeader } from '@/components/shared/page-header'
 import { UserAvatar } from '@/components/ui/avatar'
@@ -47,6 +48,8 @@ export default function GroupMembersPage() {
   const currentUserId = useCurrentUserId()
   const permissions = useMyRole(groupId)
   const actions = useAppActions()
+  // Hook first: these handlers run below an early return.
+  const { show, dialog } = useBlockedDialog()
 
   if (!group) return null
 
@@ -55,9 +58,7 @@ export default function GroupMembersPage() {
       await services.members.updateRole(groupId, userId, role)
       toast.success('Role updated')
     } catch (error) {
-      toast.error('Could not update the role', {
-        description: error instanceof Error ? error.message : 'Please try again.',
-      })
+      show('Role not changed', error)
     }
   }
 
@@ -68,9 +69,11 @@ export default function GroupMembersPage() {
         description: `${name} is now the owner. You are an admin.`,
       })
     } catch (error) {
-      toast.error('Could not hand over the group', {
-        description: error instanceof Error ? error.message : 'Please try again.',
-      })
+      show(
+        'Could not hand over the group',
+        error,
+        'Only the current owner can hand a group over, and only to someone already in it.',
+      )
     }
   }
 
@@ -79,11 +82,15 @@ export default function GroupMembersPage() {
       await services.members.remove(groupId, userId)
       toast.success('Member removed', { description: `${name} is no longer in this group.` })
     } catch (error) {
-      // The service refuses to remove anyone carrying a non-zero balance —
-      // doing so would break the group's zero-sum invariant.
-      toast.error('Could not remove them', {
-        description: error instanceof Error ? error.message : 'Please try again.',
-      })
+      // The database refuses to remove anyone carrying a non-zero balance:
+      // doing so would break the group's zero-sum invariant. That is a rule
+      // with a reason, so it gets a dialog rather than a toast that fades
+      // while it is still being read.
+      show(
+        `${name} cannot be removed yet`,
+        error,
+        'Settle up with them first, then remove them. Recording the payment sets their balance to zero.',
+      )
     }
   }
 
@@ -218,6 +225,8 @@ export default function GroupMembersPage() {
       </p>
 
       <InviteLinkPanel groupId={groupId} canManage={permissions.canManageMembers} />
+
+      {dialog}
     </div>
   )
 }

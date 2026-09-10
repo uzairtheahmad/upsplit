@@ -36,4 +36,13 @@ about are:
   session is allowed to see. Verified: an anonymous caller reads no rows from
   any table and every write is rejected.
 - Anything that requires `SUPABASE_SERVICE_ROLE_KEY`. That key bypasses every
-  policy by design. It is server-only, and it is never sent to the browser.
+  policy by design, and nothing in the app uses it: it does not need to be set
+  in the deployment at all.
+
+## A pattern worth knowing about
+
+`group_role_of()` returns NULL for a non-member. In PL/pgSQL, `if not NULL
+then` does not take the branch, so a guard written the obvious way passes for
+everyone with no role in the group. This was a real vulnerability here, fixed
+in `docs/patches/005-permission-check-null.sql`. If you are auditing a
+permission check in this schema, that is the first thing to look for.

@@ -27,8 +27,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Field, Input, Label } from '@/components/ui/input'
-import { Separator, Switch } from '@/components/ui/misc'
+import { Field, Input } from '@/components/ui/input'
+import { Separator } from '@/components/ui/misc'
 import {
   Select,
   SelectContent,
@@ -208,29 +208,11 @@ function PreferencesSection() {
 
   React.useEffect(() => setMounted(true), [])
 
-  const toggles = [
-    {
-      key: 'emailNotifications' as const,
-      label: 'Email notifications',
-      description: 'Get an email when someone adds an expense or settles with you.',
-    },
-    {
-      key: 'pushNotifications' as const,
-      label: 'Push notifications',
-      description: 'Real-time alerts on your devices.',
-    },
-    {
-      key: 'weeklySummary' as const,
-      label: 'Weekly summary',
-      description: 'A digest of what your groups spent, every Monday.',
-    },
-  ]
-
   return (
     <Card>
       <CardHeader>
         <CardTitle>Preferences</CardTitle>
-        <CardDescription>Defaults for new groups, and how we reach you.</CardDescription>
+        <CardDescription>Defaults for new groups, and how the app looks.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
         <div className="grid gap-4 sm:grid-cols-2">
@@ -281,26 +263,6 @@ function PreferencesSection() {
             </div>
           </fieldset>
         </div>
-
-        <Separator />
-
-        <ul className="space-y-4">
-          {toggles.map((toggle) => (
-            <li key={toggle.key} className="flex items-start justify-between gap-4">
-              <div className="min-w-0">
-                <Label htmlFor={`pref-${toggle.key}`}>{toggle.label}</Label>
-                <p className="mt-0.5 text-xs text-muted-foreground">{toggle.description}</p>
-              </div>
-              <Switch
-                id={`pref-${toggle.key}`}
-                checked={preferences[toggle.key]}
-                onCheckedChange={(checked) =>
-                  services.profile.updatePreferences({ [toggle.key]: checked })
-                }
-              />
-            </li>
-          ))}
-        </ul>
       </CardContent>
     </Card>
   )
@@ -328,9 +290,14 @@ function AccountSection() {
   const [confirmPassword, setConfirmPassword] = React.useState('')
   const [passwordError, setPasswordError] = React.useState<string>()
   const [savingPassword, setSavingPassword] = React.useState(false)
+  // Shown inside the confirmation rather than as a toast. The database
+  // refuses while any balance is outstanding, or while you still own a group
+  // with other people in it, and that reason is what tells you what to do.
+  const [refusal, setRefusal] = React.useState<string | null>(null)
 
   async function handleDeleteAccount() {
     setDeleting(true)
+    setRefusal(null)
     try {
       await services.profile.deleteAccount()
       // The auth row still exists, so end the session explicitly — otherwise
@@ -339,9 +306,7 @@ function AccountSection() {
       toast.success('Your account has been deleted')
     } catch (error) {
       setDeleting(false)
-      toast.error('Could not delete your account', {
-        description: error instanceof Error ? error.message : 'Please try again.',
-      })
+      setRefusal(error instanceof Error ? error.message : 'Please try again.')
     }
   }
 
@@ -506,6 +471,16 @@ function AccountSection() {
               balances depend on them. They’ll show as <em>Deleted user</em>.
             </p>
             <p className="text-sm text-muted-foreground">This cannot be undone.</p>
+
+            {refusal ? (
+              <p
+                role="alert"
+                className="flex gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
+              >
+                <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
+                {refusal}
+              </p>
+            ) : null}
           </DialogBody>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setConfirmOpen(false)} disabled={deleting}>

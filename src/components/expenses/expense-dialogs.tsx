@@ -1,6 +1,6 @@
 'use client'
 
-import { Trash2 } from 'lucide-react'
+import { AlertTriangle, Trash2 } from 'lucide-react'
 import * as React from 'react'
 import { toast } from 'sonner'
 
@@ -107,10 +107,15 @@ export function DeleteExpenseDialog({
   onDeleted?: () => void
 }) {
   const [deleting, setDeleting] = React.useState(false)
+  // A refusal is shown inside this dialog rather than as a toast: the reason
+  // belongs next to the button that was refused, and stacking a second dialog
+  // on top of a confirmation is worse than either.
+  const [refusal, setRefusal] = React.useState<string | null>(null)
 
   async function handleDelete() {
     if (!expense) return
     setDeleting(true)
+    setRefusal(null)
     try {
       await services.expenses.remove(expense.id)
       toast.success('Expense deleted', {
@@ -119,9 +124,7 @@ export function DeleteExpenseDialog({
       onOpenChange(false)
       onDeleted?.()
     } catch (error) {
-      toast.error('Could not delete the expense', {
-        description: error instanceof Error ? error.message : 'Please try again.',
-      })
+      setRefusal(error instanceof Error ? error.message : 'Please try again.')
     } finally {
       setDeleting(false)
     }
@@ -140,6 +143,16 @@ export function DeleteExpenseDialog({
             {expense ? ` (${formatMoney(expense.amount, expense.currency)})` : ''} from the group and
             updates everyone’s balances.
           </p>
+
+          {refusal ? (
+            <p
+              role="alert"
+              className="mt-3 flex gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
+            >
+              <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
+              {refusal}
+            </p>
+          ) : null}
         </DialogBody>
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={deleting}>

@@ -50,9 +50,6 @@ export interface ProfileRow {
   email: string
   avatar_url: string | null
   default_currency: string
-  email_notifications: boolean
-  push_notifications: boolean
-  weekly_summary: boolean
 }
 
 export function toUser(row: ProfileRow): User {
@@ -68,9 +65,6 @@ export function toUser(row: ProfileRow): User {
 export function toPreferences(row: ProfileRow): UserPreferences {
   return {
     defaultCurrency: row.default_currency as CurrencyCode,
-    emailNotifications: row.email_notifications,
-    pushNotifications: row.push_notifications,
-    weeklySummary: row.weekly_summary,
   }
 }
 

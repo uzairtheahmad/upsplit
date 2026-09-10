@@ -49,9 +49,10 @@ fixed.
 - **Exact money.** Integer minor units end to end, so rounding never loses or
   invents a paisa. Splitting `Rs 100` three ways gives `33.34 / 33.33 / 33.33`,
   and the parts always add back to the total.
-- **Email invitations.** Inviting an address sends a real email whether or not
-  that person has an account. Someone new gets a link to a page naming the
-  group and who invited them, and signing up joins them automatically.
+- **Invitations.** Invite by email address. Someone who already has an account
+  joins immediately; for anyone else you get a link to send them, which lands
+  on a page naming the group and who invited them, and joins them on signup.
+- **Sign in with Google**, or with an email and password.
 
 Try it without signing up: the **Try the demo** button on the landing page
 gives you your own seeded group.
@@ -109,6 +110,9 @@ Two settings in the Supabase dashboard finish the setup:
 
 - **Authentication → Sign In / Providers → Anonymous Sign-Ins**: enable it, or
   the demo button fails.
+- **Authentication → Sign In / Providers → Google**: enable it and paste a
+  client ID and secret from the Google Cloud console, or the Google buttons
+  fail. Email and password sign-in works without this.
 - **Authentication → URL Configuration**: set the Site URL to
   `http://localhost:3000` for local development.
 
@@ -166,26 +170,16 @@ that are easy to break by accident.
 | [SECURITY.md](SECURITY.md) | Reporting a vulnerability |
 | [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) | How we expect people to treat each other |
 
-## Turning on email
+## Not built yet
 
-Optional. Without it the app works normally and invitations queue in
-`email_outbox` rather than being lost, so you can add this later and everything
-already queued goes out on the next run.
+Tracked in [docs/FEATURES.md](docs/FEATURES.md).
 
-1. Get an API key from [Resend](https://resend.com). The free tier is 3,000
-   emails a month.
-2. Set `RESEND_API_KEY` and `SUPABASE_SERVICE_ROLE_KEY` in `.env.local`, and in
-   Vercel for a deployment. Both are **server-only**: never give either a
-   `NEXT_PUBLIC_` prefix.
-3. Set `EMAIL_FROM` to an address on a domain you have verified with Resend.
-   The default `onboarding@resend.dev` needs no setup but can only deliver to
-   the address that owns the Resend account, which is enough for a smoke test
-   and nothing else.
-4. Set `CRON_SECRET` to any long random string. The daily retry job in
-   [vercel.json](vercel.json) sends it automatically.
-
-`POST /api/email/dispatch` drains the queue. The app calls it right after an
-invite so mail arrives in seconds; the cron is the retry net.
+- **Outgoing email.** UpSplit sends no mail of its own. Invitations are handed
+  to the inviter as a link to share, and notifications are in-app only. Adding
+  email needs a verified sending domain, and is a good contribution if you want
+  one with real scope.
+- **Push notifications and digests.** Neither exists. There are deliberately no
+  settings toggles for them, rather than switches that control nothing.
 
 ## License
 

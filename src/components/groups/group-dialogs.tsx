@@ -1,6 +1,6 @@
 'use client'
 
-import { Check } from 'lucide-react'
+import { Check, Copy } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import * as React from 'react'
 import { toast } from 'sonner'
@@ -266,6 +266,12 @@ export function CreateGroupDialog({
   )
 }
 
+/** Where an emailed-style invitation token is redeemed. */
+function invitationUrl(token: string): string {
+  if (typeof window === 'undefined') return `/invite/${token}`
+  return `${window.location.origin}/invite/${token}`
+}
+
 export function InviteMemberDialog({
   open,
   onOpenChange,
@@ -280,6 +286,10 @@ export function InviteMemberDialog({
   const [email, setEmail] = React.useState('')
   const [errors, setErrors] = React.useState<{ email?: string }>({})
   const [saving, setSaving] = React.useState(false)
+  // Set when the invited address has no account yet. There is no email being
+  // sent, so the link has to be handed back to whoever did the inviting.
+  const [pending, setPending] = React.useState<{ email: string; token: string } | null>(null)
+  const [copied, setCopied] = React.useState(false)
 
   const memberIds = new Set(members.map((member) => member.userId))
   const suggestions = users.filter((user) => !memberIds.has(user.id))
@@ -296,6 +306,17 @@ export function InviteMemberDialog({
     }
   }
 
+  async function copyInvitation() {
+    if (!pending) return
+    try {
+      await navigator.clipboard.writeText(invitationUrl(pending.token))
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 2000)
+    } catch {
+      toast.error('Could not copy', { description: 'Select the link and copy it instead.' })
+    }
+  }
+
   async function handleInvite(event: React.FormEvent) {
     event.preventDefault()
     const next: typeof errors = {}
@@ -308,27 +329,23 @@ export function InviteMemberDialog({
       const result = await services.members.invite(groupId, email)
 
       if (result.status === 'added') {
-        toast.success('Member added', {
-          description: `${result.user.name} joined the group, and has been emailed about it.`,
-        })
+        toast.success('Member added', { description: `${result.user.name} joined the group.` })
+        setEmail('')
+        onOpenChange(false)
       } else if (result.status === 'already_member') {
         toast.info('Already in the group', {
           description: `${result.user.name} is already a member.`,
         })
+        setEmail('')
+        onOpenChange(false)
       } else {
-        // No account yet. They have been emailed a link, and the signup
-        // trigger turns the stored invitation into membership the moment they
-        // register with that address.
-        toast.success('Invitation sent', {
-          description: `${result.email} has been emailed a link to join. It is good for 14 days.`,
-          duration: 8000,
-        })
+        // No account yet. Nothing is emailed, so the dialog stays open and
+        // shows the link for the inviter to send however they like.
+        setPending({ email: result.email, token: result.token })
+        setCopied(false)
       }
-
-      setEmail('')
-      onOpenChange(false)
     } catch (error) {
-      toast.error('Could not send the invitation', {
+      toast.error('Could not create the invitation', {
         description: error instanceof Error ? error.message : 'Please try again.',
       })
     } finally {
@@ -342,13 +359,37 @@ export function InviteMemberDialog({
         <DialogHeader>
           <DialogTitle>Invite someone</DialogTitle>
           <DialogDescription>
-            Invite by email. Either way they get a message: someone with an
-            UpSplit account joins straight away, and anyone else gets a link to
-            sign up and join.
+            Someone with an UpSplit account joins straight away. For anyone
+            else you get a link to send them, and they join when they sign up.
           </DialogDescription>
         </DialogHeader>
 
         <DialogBody className="space-y-5">
+          {pending ? (
+            <div className="space-y-2.5 rounded-lg border border-border bg-muted/40 p-3.5">
+              <p className="text-sm font-medium">
+                {pending.email} does not have an account yet
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Send them this link. It works for 14 days, and joins them to this group as
+                soon as they sign up.
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <Input
+                  readOnly
+                  value={invitationUrl(pending.token)}
+                  aria-label="Invitation link"
+                  className="min-w-0 flex-1 font-mono text-xs"
+                  onFocus={(event) => event.currentTarget.select()}
+                />
+                <Button type="button" variant="outline" size="sm" onClick={copyInvitation}>
+                  {copied ? <Check aria-hidden /> : <Copy aria-hidden />}
+                  {copied ? 'Copied' : 'Copy'}
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
           <form onSubmit={handleInvite} id="invite-form" className="space-y-4" noValidate>
             <Field label="Email" htmlFor="invite-email" error={errors.email}>
               <Input
@@ -386,10 +427,10 @@ export function InviteMemberDialog({
 
         <DialogFooter>
           <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>
-            Cancel
+            {pending ? 'Done' : 'Cancel'}
           </Button>
           <Button type="submit" form="invite-form" loading={saving}>
-            Send invitation
+            {pending ? 'Invite another' : 'Create invitation'}
           </Button>
         </DialogFooter>
       </DialogContent>

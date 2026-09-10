@@ -129,9 +129,6 @@ create table public.profiles (
   email               text        not null,
   avatar_url          text,
   default_currency    text        not null default 'PKR' references public.currencies (code),
-  email_notifications boolean     not null default true,
-  push_notifications  boolean     not null default false,
-  weekly_summary      boolean     not null default true,
   created_at          timestamptz not null default now(),
   updated_at          timestamptz not null default now(),
   -- Accounts are anonymised rather than deleted: the expenses a person created
@@ -388,32 +385,6 @@ create index expense_comments_expense_idx
   on public.expense_comments (expense_id, created_at)
   where deleted_at is null;
 
--- ── email_outbox ────────────────────────────────────────────────────────────
--- Outgoing mail is queued here rather than sent inline. A write RPC cannot
--- wait on an HTTP call without holding its transaction open, and a send that
--- fails mid-transaction would either roll back the expense or vanish silently.
---
--- A scheduled worker drains this table. Never client-readable: it contains
--- other people's addresses.
-create table public.email_outbox (
-  id         bigint generated always as identity primary key,
-  to_email   text        not null,
-  subject    text        not null,
-  body       text        not null,
-  template   text,
-  payload    jsonb,
-  created_at timestamptz not null default now(),
-  sent_at    timestamptz,
-  attempts   integer     not null default 0,
-  last_error text
-);
-
--- The worker asks only "what is still unsent?", so the index excludes the
--- rows that will dominate the table over time.
-create index email_outbox_pending_idx
-  on public.email_outbox (created_at)
-  where sent_at is null;
-
 -- =============================================================================
 -- 3. HELPER FUNCTIONS
 -- =============================================================================
@@ -488,9 +459,6 @@ language plpgsql
 security definer
 set search_path = public
 as $$
-declare
-  v_email text;
-  v_wants boolean;
 begin
   if p_user_id is null then
     return;
@@ -498,22 +466,6 @@ begin
 
   insert into public.notifications (user_id, group_id, kind, title, body, href)
   values (p_user_id, p_group_id, p_kind, p_title, p_body, p_href);
-
-  select email, email_notifications
-    into v_email, v_wants
-    from public.profiles
-   where id = p_user_id and deleted_at is null;
-
-  if coalesce(v_wants, false) and v_email is not null then
-    insert into public.email_outbox (to_email, subject, body, template, payload)
-    values (
-      v_email,
-      p_title,
-      p_body,
-      p_kind::text,
-      jsonb_build_object('href', p_href, 'group_id', p_group_id)
-    );
-  end if;
 end;
 $$;
 
@@ -1034,21 +986,8 @@ begin
                 expires_at = now() + interval '14 days'
   returning token into v_token;
 
-  perform public.queue_email(
-    v_email,
-    v_inviter || ' invited you to ' || v_group || ' on UpSplit',
-    v_inviter || ' wants to share expenses with you in ' || v_group ||
-      '. Create your free account to see what everyone has paid and what you owe.',
-    'invitation',
-    jsonb_build_object(
-      'token',        v_token,
-      'group_id',     p_group_id,
-      'group_name',   v_group,
-      'inviter_name', v_inviter,
-      'href',         '/invite/' || v_token
-    )
-  );
-
+  -- Nothing is emailed. The token goes back to whoever did the inviting, and
+  -- they send the /invite/<token> link themselves.
   return jsonb_build_object(
     'status',       'pending',
     'email',        v_email,
@@ -1057,27 +996,6 @@ begin
     'inviter_name', v_inviter
   );
 end;
-$$;
-
-
--- Puts a message in the outbox for an address that may have no account.
--- notify_user() cannot: it starts from a user id and reads their preference.
--- Execute is revoked from anon and authenticated in the grants section, so
--- this cannot be used as an open mail relay.
-create or replace function public.queue_email(
-  p_to       text,
-  p_subject  text,
-  p_body     text,
-  p_template text,
-  p_payload  jsonb default '{}'::jsonb
-)
-returns void
-language sql
-security definer
-set search_path = public
-as $$
-  insert into public.email_outbox (to_email, subject, body, template, payload)
-  values (lower(btrim(p_to)), p_subject, p_body, p_template, p_payload);
 $$;
 
 
@@ -1894,11 +1812,6 @@ begin
          avatar_url = null,
          deleted_at = now()
    where id = v_actor;
-
-  -- Nothing further should be sent to a deleted account.
-  delete from public.email_outbox
-   where sent_at is null
-     and to_email = (select email from public.profiles where id = v_actor);
 end;
 $$;
 
@@ -1943,13 +1856,23 @@ begin
     return new;
   end if;
 
+  -- Every provider names these differently. The signup form sends full_name;
+  -- Google sends name and picture. Without both spellings a Google account
+  -- lands with the email prefix as its display name and no photo.
   v_name := coalesce(
     nullif(btrim(new.raw_user_meta_data->>'full_name'), ''),
+    nullif(btrim(new.raw_user_meta_data->>'name'), ''),
     split_part(v_email, '@', 1)
   );
 
   insert into public.profiles (id, full_name, email, avatar_url)
-  values (new.id, v_name, new.email, new.raw_user_meta_data->>'avatar_url')
+  values (
+    new.id, v_name, new.email,
+    coalesce(
+      nullif(btrim(new.raw_user_meta_data->>'avatar_url'), ''),
+      nullif(btrim(new.raw_user_meta_data->>'picture'), '')
+    )
+  )
   on conflict (id) do nothing;
 
   -- Claim every group that was waiting for this address.
@@ -2145,7 +2068,6 @@ alter table public.notifications        enable row level security;
 alter table public.group_invitations    enable row level security;
 alter table public.group_invite_links   enable row level security;
 alter table public.expense_comments     enable row level security;
-alter table public.email_outbox         enable row level security;
 alter table public.currencies           enable row level security;
 
 -- ── currencies: a public lookup table ───────────────────────────────────────
@@ -2330,10 +2252,6 @@ create policy expense_comments_update on public.expense_comments
   using (author_id = auth.uid())
   with check (author_id = auth.uid());
 
--- ── email_outbox ────────────────────────────────────────────────────────────
--- No policies at all. The queue holds other people's addresses, and only the
--- worker (service_role, which bypasses RLS) has any business reading it.
-
 -- ── ledger_entries ──────────────────────────────────────────────────────────
 -- Read-only to clients. There is deliberately no INSERT, UPDATE or DELETE
 -- policy: the ledger is derived, and the only things that may write to it are
@@ -2376,13 +2294,6 @@ grant execute on function public.add_expense_comment(uuid, text) to authenticate
 grant execute on function public.create_invite_link(uuid, timestamptz) to authenticated;
 grant execute on function public.invitation_preview(text) to anon, authenticated;
 grant execute on function public.accept_invitation(text) to authenticated;
-
--- queue_email is the one function nothing signed in may call. This schema sets
--- `alter default privileges ... grant all on functions`, so without this revoke
--- any user could send arbitrary mail from your domain. The SECURITY DEFINER
--- functions that call it run as the owner and do not need the grant.
-revoke execute on function
-  public.queue_email(text, text, text, text, jsonb) from anon, authenticated;
 grant execute on function public.revoke_invite_link(uuid) to authenticated;
 grant execute on function public.accept_invite_link(text) to authenticated;
 grant execute on function public.transfer_group_ownership(uuid, uuid) to authenticated;
@@ -2414,9 +2325,6 @@ grant select (id, group_id, email, invited_by, created_at, expires_at, accepted_
 
 revoke insert, update, delete on public.group_invite_links from authenticated;
 revoke insert, delete on public.expense_comments from authenticated;
-
--- The outbox is the worker's alone. Not even readable by a signed-in user.
-revoke all on public.email_outbox from authenticated, anon;
 
 
 -- =============================================================================
