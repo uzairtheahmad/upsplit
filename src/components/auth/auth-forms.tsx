@@ -92,7 +92,17 @@ function GoogleButton({ next, label }: { next: string; label: string }) {
     // is only ever cleared on failure.
     if (error) {
       setLoading(false)
-      toast.error('Could not continue with Google', { description: error.message })
+      // "Unsupported provider: provider is not enabled" is a deployment
+      // problem, not something the person at the keyboard can act on. Say what
+      // they can do instead, and keep the original in the console.
+      const misconfigured = /provider is not enabled|unsupported provider/i.test(error.message)
+      if (misconfigured) console.error('[UpSplit] Google sign-in is not enabled', error)
+
+      toast.error('Google sign-in is unavailable', {
+        description: misconfigured
+          ? 'It is not set up on this site yet. Use your email and password for now.'
+          : error.message,
+      })
     }
   }
 
