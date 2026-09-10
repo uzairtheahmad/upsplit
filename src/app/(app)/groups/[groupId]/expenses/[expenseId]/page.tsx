@@ -20,7 +20,6 @@ import {
   useCurrentUserId,
   useExpense,
   useGroup,
-  useGroupMembers,
   useUserMap,
 } from '@/hooks/use-app-data'
 import {
@@ -36,7 +35,6 @@ export default function ExpenseDetailPage() {
   const router = useRouter()
   const expense = useExpense(expenseId)
   const group = useGroup(groupId)
-  const members = useGroupMembers(groupId)
   const users = useUserMap()
   const currentUserId = useCurrentUserId()
 

@@ -73,7 +73,6 @@ interface SplitEditorProps {
   currentUserId: string
   currency: CurrencyCode
   total: Money
-  shares: Array<{ userId: string; amount: Money }>
   validation: SplitValidation
   onValueChange: (userId: string, value: number | undefined) => void
 }
@@ -91,20 +90,18 @@ export function SplitEditor({
   currentUserId,
   currency,
   total,
-  shares,
   validation,
   onValueChange,
 }: SplitEditorProps) {
   if (method === 'equal' || participants.length === 0) return null
 
   const memberMap = new Map(members.map((member) => [member.id, member]))
-  const shareMap = new Map(shares.map((share) => [share.userId, share.amount]))
 
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <Label>Exact amounts</Label>
-        <SplitDifference method={method} validation={validation} currency={currency} />
+        <SplitDifference validation={validation} currency={currency} />
       </div>
 
       <div className="divide-y divide-border rounded-lg border border-border">
@@ -122,7 +119,6 @@ export function SplitEditor({
 
               <SplitValueInput
                 id={inputId}
-                method={method}
                 currency={currency}
                 value={participant.value}
                 name={member.name}
@@ -145,14 +141,12 @@ export function SplitEditor({
 
 function SplitValueInput({
   id,
-  method,
   currency,
   value,
   name,
   onChange,
 }: {
   id: string
-  method: SplitMethod
   currency: CurrencyCode
   value: number | undefined
   name: string
@@ -188,11 +182,9 @@ function SplitValueInput({
 }
 
 function SplitDifference({
-  method,
   validation,
   currency,
 }: {
-  method: SplitMethod
   validation: SplitValidation
   currency: CurrencyCode
 }) {

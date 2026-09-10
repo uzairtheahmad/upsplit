@@ -104,7 +104,7 @@ export default function BalancesPage() {
           entries={ledger.people}
           users={users}
           currency={currency}
-          onSettle={(userId, amount) => {
+          onSettle={(userId) => {
             // Settle against the group where the largest part of the balance sits.
             const best = ledger.perGroup
               .map((entry) => ({

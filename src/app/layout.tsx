@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 
 import { Providers } from '@/components/layout/providers'
+import { siteUrl } from '@/lib/site'
 
 import './globals.css'
 
@@ -11,7 +12,7 @@ const inter = Inter({
   variable: '--font-inter',
 })
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://upsplit.vercel.app'
+const SITE_URL = siteUrl()
 const DESCRIPTION =
   'Track shared expenses, see exactly who owes whom, and settle up in the fewest possible payments. Free, no ads.'
 

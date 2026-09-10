@@ -141,6 +141,56 @@ machine.
 4. Add an RLS policy if you added a table. Every table has RLS enabled.
 5. Add tests for any calculation the feature introduces.
 
+## Email
+
+Every message is queued into `email_outbox` by the database, inside the same
+transaction as the thing that caused it. A write RPC cannot hold its
+transaction open across an HTTP call, and an inline send that failed would
+vanish with nothing to retry.
+
+`POST /api/email/dispatch` drains the queue. Two callers are allowed: the app
+itself right after an invite, so the mail arrives in seconds, and a daily cron
+carrying `CRON_SECRET`, which retries anything that failed. The run is
+idempotent and returns only counts.
+
+Draining needs `SUPABASE_SERVICE_ROLE_KEY`, because `email_outbox` has RLS
+enabled and **no policy at all**. Queued mail is other people's private
+notification text, so nothing signed in should be able to read it.
+
+Two details worth keeping:
+
+- The attempt counter is incremented **before** the send, not after. If the
+  function is killed mid-send by a serverless timeout, the row must not look
+  untouched, or a slow message gets delivered on every subsequent run.
+- A 4xx from the provider is not retried. The request itself is wrong (bad key,
+  unverified domain, malformed address) and retrying sends the same broken
+  request again. Only 429 and 5xx are retried.
+
+`queue_email()` is the one function in the schema that `authenticated` may not
+execute. The schema sets `alter default privileges ... grant all on functions`,
+so without an explicit revoke any signed-in user could send arbitrary mail from
+your domain.
+
+## Invitations
+
+Two separate mechanisms, easy to confuse:
+
+| | `group_invite_links` | `group_invitations` |
+| --- | --- | --- |
+| For | Sharing a group with anyone | One specific address |
+| Lifetime | One live link per group, rotatable | One per address per group, 14 days |
+| Lands on | `/join/[token]`, sign-in required | `/invite/[token]`, public |
+
+The email path is public because the recipient has no account yet. Bouncing
+them to `/login` would show a stranger a sign-in form with no explanation of
+what they were invited to. `invitation_preview()` is granted to `anon` and
+returns only the group's name, who invited them, and how many people are in it.
+No member list, no other addresses, no amounts.
+
+Accepting is a button, never an effect that fires on load. Joining a group
+changes someone's account, and a link in an email can be followed by accident
+or prefetched by a mail client.
+
 ## Security
 
 Route protection lives in `middleware.ts` and uses `getUser()`, which

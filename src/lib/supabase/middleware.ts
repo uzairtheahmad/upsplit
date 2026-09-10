@@ -3,8 +3,20 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 import { supabaseAnonKey, supabaseUrl } from './env'
 
-/** Routes reachable without a session. Everything else requires one. */
-const PUBLIC_ROUTES = ['/login', '/signup', '/forgot-password', '/auth']
+/**
+ * Routes reachable without a session. Everything else requires one.
+ *
+ * `/invite` is public because the whole point of an emailed invitation is that
+ * the recipient has no account yet. Bouncing them to /login would show a
+ * stranger a sign-in form with no explanation of what they were invited to.
+ * The page itself reveals only the group's name and who invited them.
+ *
+ * `/api` is listed because a redirect is the wrong answer to an API call: a
+ * scheduler or a fetch() gets a 307 to an HTML sign-in page instead of a
+ * status code it can act on. Every route under /api therefore does its own
+ * authorisation. If you add one, that is now your job.
+ */
+const PUBLIC_ROUTES = ['/login', '/signup', '/forgot-password', '/auth', '/invite', '/api']
 
 function isPublic(pathname: string): boolean {
   return pathname === '/' || PUBLIC_ROUTES.some((route) => pathname.startsWith(route))
@@ -72,7 +84,15 @@ export async function updateSession(request: NextRequest) {
 
   if (user && (pathname === '/login' || pathname === '/signup')) {
     const url = request.nextUrl.clone()
-    url.pathname = '/dashboard'
+    // Honour ?next= so somebody who followed an invitation link and happened
+    // to be signed in already still lands on the invitation rather than being
+    // dumped on the dashboard with no idea what happened.
+    // A single leading slash only: "//evil.com" also starts with "/", and
+    // while assigning to .pathname keeps the origin, refusing it here means
+    // the rule does not depend on that subtlety staying true.
+    const next = request.nextUrl.searchParams.get('next')
+    const safe = next && next.startsWith('/') && !next.startsWith('//')
+    url.pathname = safe ? next : '/dashboard'
     url.search = ''
     return NextResponse.redirect(url)
   }

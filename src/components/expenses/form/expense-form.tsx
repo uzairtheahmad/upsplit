@@ -209,7 +209,6 @@ export function ExpenseForm({
         currentUserId={currentUserId}
         currency={currency}
         total={form.amount}
-        shares={form.shares}
         validation={form.splitValidation}
         onValueChange={form.setParticipantValue}
       />

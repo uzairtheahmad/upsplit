@@ -147,7 +147,7 @@ export default function GroupSettingsPage() {
                     {group.currency} · {CURRENCIES[group.currency].symbol}
                   </span>
                   <span className="sr-only">
-                    This group's currency is fixed and cannot be changed.
+                    This group’s currency is fixed and cannot be changed.
                   </span>
                 </div>
               </Field>

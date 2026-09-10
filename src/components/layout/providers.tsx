@@ -12,7 +12,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <TooltipProvider delayDuration={250} skipDelayDuration={400}>
         {children}
         <Toaster
-          position="bottom-right"
+          position="top-center"
           closeButton
           richColors={false}
           toastOptions={{

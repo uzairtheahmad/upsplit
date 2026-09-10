@@ -49,8 +49,9 @@ fixed.
 - **Exact money.** Integer minor units end to end, so rounding never loses or
   invents a paisa. Splitting `Rs 100` three ways gives `33.34 / 33.33 / 33.33`,
   and the parts always add back to the total.
-- **Invites by email, invite links, comments, activity history** and per-group
-  roles.
+- **Email invitations.** Inviting an address sends a real email whether or not
+  that person has an account. Someone new gets a link to a page naming the
+  group and who invited them, and signing up joins them automatically.
 
 Try it without signing up: the **Try the demo** button on the landing page
 gives you your own seeded group.
@@ -95,6 +96,15 @@ It ends with a verification query returning four rows. Every `failures` value
 must be `0`. If any is non-zero the books do not balance, so stop and open an
 issue rather than building on that database.
 
+### Patching a database that already has data
+
+`schema.sql` is for a fresh project. If yours already holds real data, run the
+files in [`docs/patches/`](docs/patches) **in numeric order** instead. Each is
+safe on a live database: they add and replace, they never drop.
+
+Everything in `docs/patches/` is already folded into `schema.sql`, so a fresh
+run needs none of them.
+
 Two settings in the Supabase dashboard finish the setup:
 
 - **Authentication → Sign In / Providers → Anonymous Sign-Ins**: enable it, or
@@ -112,6 +122,8 @@ npm run dev        # http://localhost:3000
 
 ```bash
 npm run dev        # dev server
+npm run lint       # eslint
+npm run lint:fix   # eslint, fixing what it can
 npm test           # the accounting test suite (63 tests)
 npm run typecheck  # tsc --noEmit
 npm run build      # production build
@@ -130,7 +142,7 @@ bug fix, a feature, or a typo in this file.
 
 1. **Fork** the repo and clone your fork.
 2. **Branch** off `main`: `git checkout -b fix/duplicate-settlement`.
-3. **Build and test it**: `npm test && npm run typecheck && npm run build`.
+3. **Check it**: `npm run lint && npm test && npm run typecheck && npm run build`.
 4. **Open a pull request** against `main`.
 5. **Include a Loom** (or any screen recording) showing your change working.
    This is required. A recording tells us in thirty seconds what a paragraph
@@ -152,16 +164,28 @@ that are easy to break by accident.
 | [docs/FEATURES.md](docs/FEATURES.md) | What the product does and which decisions are closed |
 | [docs/schema.sql](docs/schema.sql) | The database, single source of truth |
 | [SECURITY.md](SECURITY.md) | Reporting a vulnerability |
+| [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) | How we expect people to treat each other |
 
-## Not built yet
+## Turning on email
 
-Tracked in [docs/FEATURES.md](docs/FEATURES.md). The main outstanding piece:
+Optional. Without it the app works normally and invitations queue in
+`email_outbox` rather than being lost, so you can add this later and everything
+already queued goes out on the next run.
 
-- **Email delivery.** `notify_user()` queues into `email_outbox` and respects
-  each person's notification preference, but no worker drains the queue yet, so
-  nothing is actually sent. In-app notifications are unaffected. This needs an
-  email provider plus a scheduled function, and is a good contribution if you
-  want one with real scope.
+1. Get an API key from [Resend](https://resend.com). The free tier is 3,000
+   emails a month.
+2. Set `RESEND_API_KEY` and `SUPABASE_SERVICE_ROLE_KEY` in `.env.local`, and in
+   Vercel for a deployment. Both are **server-only**: never give either a
+   `NEXT_PUBLIC_` prefix.
+3. Set `EMAIL_FROM` to an address on a domain you have verified with Resend.
+   The default `onboarding@resend.dev` needs no setup but can only deliver to
+   the address that owns the Resend account, which is enough for a smoke test
+   and nothing else.
+4. Set `CRON_SECRET` to any long random string. The daily retry job in
+   [vercel.json](vercel.json) sends it automatically.
+
+`POST /api/email/dispatch` drains the queue. The app calls it right after an
+invite so mail arrives in seconds; the cron is the retry net.
 
 ## License
 

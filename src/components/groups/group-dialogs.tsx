@@ -309,17 +309,18 @@ export function InviteMemberDialog({
 
       if (result.status === 'added') {
         toast.success('Member added', {
-          description: `${result.user.name} joined the group.`,
+          description: `${result.user.name} joined the group, and has been emailed about it.`,
         })
       } else if (result.status === 'already_member') {
         toast.info('Already in the group', {
           description: `${result.user.name} is already a member.`,
         })
       } else {
-        // No account yet. The invitation is stored, and the signup trigger
-        // turns it into membership the moment they register.
-        toast.success('Invitation saved', {
-          description: `${result.email} needs to sign up first. They'll join this group automatically when they do.`,
+        // No account yet. They have been emailed a link, and the signup
+        // trigger turns the stored invitation into membership the moment they
+        // register with that address.
+        toast.success('Invitation sent', {
+          description: `${result.email} has been emailed a link to join. It is good for 14 days.`,
           duration: 8000,
         })
       }
@@ -341,8 +342,9 @@ export function InviteMemberDialog({
         <DialogHeader>
           <DialogTitle>Invite someone</DialogTitle>
           <DialogDescription>
-            Invite by email. If they already have an UpSplit account they join
-            straight away; if not, they'll be added as soon as they sign up.
+            Invite by email. Either way they get a message: someone with an
+            UpSplit account joins straight away, and anyone else gets a link to
+            sign up and join.
           </DialogDescription>
         </DialogHeader>
 

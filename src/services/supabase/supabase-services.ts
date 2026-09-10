@@ -18,6 +18,7 @@ import type {
   CreateSettlementInput,
   DataServices,
   ExpenseQuery,
+  InvitationPreview,
   UpdateExpenseInput,
   UpdateGroupInput,
 } from '../types'
@@ -105,6 +106,22 @@ async function fetchGroup(id: string): Promise<Group> {
   if (error) throw new Error(error.message)
   if (!data) throw new Error('That group no longer exists')
   return toGroup(data as GroupRow)
+}
+
+/**
+ * Asks the server to send whatever is queued in the email outbox.
+ *
+ * Deliberately fire-and-forget. The mail is already durably queued by the time
+ * this runs, so a failure here delays delivery until the next scheduled run
+ * rather than losing anything. Blocking an invite on an SMTP round trip would
+ * trade a guarantee for a spinner.
+ */
+async function flushEmailOutbox(): Promise<void> {
+  try {
+    await fetch('/api/email/dispatch', { method: 'POST' })
+  } catch {
+    // Offline, or the route is not deployed. The queue keeps the message.
+  }
 }
 
 export const supabaseServices: DataServices = {
@@ -220,12 +237,21 @@ export const supabaseServices: DataServices = {
       if (error) throw new Error(error.message)
 
       const result = data as
-        | { status: 'added' | 'already_member'; user_id: string }
-        | { status: 'pending'; email: string }
+        | { status: 'already_member'; user_id: string }
+        | { status: 'added'; user_id: string; email: string }
+        | { status: 'pending'; email: string; token: string; group_name: string }
+
+      // The RPC queued the mail inside its own transaction. Push it out now
+      // rather than waiting for the schedule, so an invitation lands while the
+      // person who sent it is still looking at the screen. Failures stay in
+      // the outbox for the scheduled run to retry, so this is allowed to lose.
+      if (result.status !== 'already_member') {
+        void flushEmailOutbox()
+      }
 
       // Nobody joined a group, so there is nothing new to load.
       if (result.status === 'pending') {
-        return { status: 'pending', email: result.email }
+        return { status: 'pending', email: result.email, token: result.token }
       }
 
       await refreshWorkspace()
@@ -682,6 +708,21 @@ export const supabaseServices: DataServices = {
     async deleteAccount() {
       const { error } = await db().rpc('delete_my_account')
       if (error) throw new Error(error.message)
+    },
+  },
+
+  invitations: {
+    async preview(token) {
+      const { data, error } = await db().rpc('invitation_preview', { p_token: token })
+      if (error) throw new Error(error.message)
+      return data as InvitationPreview
+    },
+
+    async accept(token) {
+      const { data, error } = await db().rpc('accept_invitation', { p_token: token })
+      if (error) throw new Error(error.message)
+      await refreshWorkspace()
+      return data as string
     },
   },
 

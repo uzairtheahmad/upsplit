@@ -22,6 +22,7 @@ Closes #
 
 ## Checklist
 
+- [ ] `npm run lint` passes
 - [ ] `npm test` passes
 - [ ] `npm run typecheck` passes
 - [ ] `npm run build` passes

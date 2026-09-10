@@ -117,14 +117,18 @@ Prefixes we use: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`.
 
 ## 5. Check it before you push
 
-All three must pass. CI runs them on your PR anyway, so you may as well find
+All four must pass. CI runs them on your PR anyway, so you may as well find
 out now:
 
 ```bash
+npm run lint
 npm test
 npm run typecheck
 npm run build
 ```
+
+`npm run lint:fix` fixes the mechanical ones for you. Note that `npm run build`
+runs ESLint as well, so a lint error fails the build.
 
 > Stop the dev server before running `npm run build`. They share the `.next`
 > directory and will corrupt each other.
@@ -163,6 +167,11 @@ about you. Push more commits to the same branch and the PR updates itself.
 
 If the PR sits for a week without a response, feel free to bump it with a
 comment.
+
+## Code of conduct
+
+By participating you agree to the [Code of Conduct](CODE_OF_CONDUCT.md). In
+short: be decent to people. Report problems to uzairkbrr@gmail.com.
 
 ## Reporting bugs
 

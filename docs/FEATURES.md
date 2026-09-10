@@ -21,6 +21,7 @@ changes columns that hold data rather than adding new tables.
 | **Account deletion** | Anonymise, keep history | The expenses a person created are still referenced by groups that need them. Deleting the row would change other people's balances. |
 | **Invite links** | Reusable, revocable, optional expiry | One live link per group. Rotating replaces it, so an old token stops working rather than lingering. |
 | **Email** | Outbox table + worker | A write RPC cannot hold its transaction open on an HTTP call, and a failed inline send would vanish. Queued sends are retryable and auditable. |
+| **Invitation tokens** | 32 random bytes, 14-day expiry | Holding the token is the authorisation, so it must be unguessable and must not live forever. Separate from the reusable per-group invite link, which is for sharing rather than for one address. |
 
 ---
 
@@ -66,7 +67,7 @@ the split.
 | ✅ Groups | Create, rename, icon, colour, archive, restore, delete. |
 | ✅ Roles | `owner` / `admin` / `member`. Exactly one owner per group. |
 | ✅ Members | Add, change role, remove. Removal refuses if the member's net is non-zero. |
-| ✅ Email invitations | Invite by **email only** — no name is asked for; the name comes from the account. Someone with an account joins immediately; someone without gets a stored invitation that is claimed automatically on signup. |
+| ✅ Email invitations | Invite by **email only**, no name is asked for; the name comes from the account. Someone with an account joins immediately and is emailed about it. Someone without gets a real invitation email with a 14-day link to `/invite/[token]`, a public page naming the group and who invited them. Signing up with the invited address claims the invitation automatically; anyone else can accept the token explicitly. |
 | ✅ Expenses | Equal and exact splits, multiple payers, payer-who-isn't-a-participant, notes, category, date. |
 | ✅ Expense delete | The **creator or a group admin** may delete. Soft delete — history is never destroyed. |
 | ✅ Settlements | Record a payment between two people; debt simplification suggests at most `n − 1` transfers. |
@@ -100,7 +101,7 @@ is a courtesy to the user and the database's is the actual rule.
 | ✅ **Avatar uploads** | Settings → Profile. Writes to `avatars/<user-id>/…`; the storage policy only permits writes inside a folder named after your own id, so the path *is* the check. 2 MB cap, images only. |
 | ✅ **Account deletion** | Anonymises: memberships dropped, name and photo scrubbed, expenses and settlements left intact so nobody else's balances move. Refuses while any balance is outstanding or a group you own still has other people in it. Signs you out afterwards. |
 | ✅ **One-click demo** | The landing page signs a visitor in anonymously and calls `start_demo()`, which builds them their **own** group seeded with the souvenirs example, an exact split and a two-payer expense. Per-visitor, so nobody can spoil it for anyone else and there is nothing to reset. A dismissible banner offers a real account. Requires Anonymous Sign-Ins enabled in Supabase. |
-| ⏸ **Real email** | `email_outbox` fills correctly; no worker drains it yet. Waiting on a provider. In-app notifications are unaffected. |
+| ✅ **Real email** | `email_outbox` is drained by `POST /api/email/dispatch`, which the app calls right after an invite and a daily Vercel cron calls again to retry. Resend is the provider, behind a single `deliver()` function. Attempts are counted before the send, so a timeout cannot cause a double delivery; a 4xx is not retried, a 429 or 5xx is. Needs `RESEND_API_KEY` and `SUPABASE_SERVICE_ROLE_KEY`; without them mail queues safely and goes out once they exist. |
 
 ## 6. Excluded
 

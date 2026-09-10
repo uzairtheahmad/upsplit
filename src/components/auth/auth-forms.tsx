@@ -22,6 +22,20 @@ import { createClient } from '@/lib/supabase/client'
 
 const EMAIL_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
 
+/**
+ * Where to go after authenticating.
+ *
+ * Middleware sets ?next when it bounces someone, and an invitation link sets
+ * it so the recipient lands back on the invitation instead of a bare
+ * dashboard. Only a same-site path is accepted: a full URL, or the
+ * protocol-relative "//evil.com", would turn this into an open redirect.
+ */
+function safeNext(params: URLSearchParams | null): string {
+  const next = params?.get('next')
+  if (!next || !next.startsWith('/') || next.startsWith('//')) return '/dashboard'
+  return next
+}
+
 function PasswordInput({
   id,
   value,
@@ -97,8 +111,7 @@ export function LoginForm() {
     toast.success('Welcome back')
     // Middleware set ?next when it bounced an unauthenticated visitor, so
     // signing in returns them to the page they actually asked for.
-    const destination = searchParams.get('next') || '/dashboard'
-    router.replace(destination)
+    router.replace(safeNext(searchParams))
     router.refresh()
   }
 
@@ -163,7 +176,10 @@ export function LoginForm() {
 
       <p className="text-center text-sm text-muted-foreground">
         New here?{' '}
-        <Link href="/signup" className="font-medium text-primary underline-offset-4 hover:underline">
+        <Link
+          href={`/signup?next=${encodeURIComponent(safeNext(searchParams))}`}
+          className="font-medium text-primary underline-offset-4 hover:underline"
+        >
           Create an account
         </Link>
       </p>
@@ -173,9 +189,13 @@ export function LoginForm() {
 
 export function SignupForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   const [name, setName] = React.useState('')
-  const [email, setEmail] = React.useState('')
+  // An invitation link carries the address it was sent to, so the person does
+  // not have to retype it, and so they sign up with the address the pending
+  // invitation is filed under.
+  const [email, setEmail] = React.useState(() => searchParams.get('email') ?? '')
   const [password, setPassword] = React.useState('')
   const [confirm, setConfirm] = React.useState('')
   const [accepted, setAccepted] = React.useState(false)
@@ -209,18 +229,22 @@ export function SignupForm() {
       return
     }
 
+    const destination = safeNext(searchParams)
+
     // With email confirmation on, signUp returns a user but no session.
     if (!data.session) {
       setLoading(false)
       toast.success('Check your inbox', {
         description: 'Confirm your email address to finish signing up.',
       })
-      router.push('/login')
+      // Carry the destination through, so confirming and then logging in still
+      // ends on the invitation they were following.
+      router.push(`/login?next=${encodeURIComponent(destination)}`)
       return
     }
 
     toast.success('Account created', { description: 'Welcome to UpSplit.' })
-    router.replace('/dashboard')
+    router.replace(destination)
     router.refresh()
   }
 
@@ -311,7 +335,10 @@ export function SignupForm() {
 
       <p className="text-center text-sm text-muted-foreground">
         Already have an account?{' '}
-        <Link href="/login" className="font-medium text-primary underline-offset-4 hover:underline">
+        <Link
+          href={`/login?next=${encodeURIComponent(safeNext(searchParams))}`}
+          className="font-medium text-primary underline-offset-4 hover:underline"
+        >
           Log in
         </Link>
       </p>

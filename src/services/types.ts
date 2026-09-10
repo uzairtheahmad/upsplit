@@ -1,5 +1,6 @@
 import type {
   AppNotification,
+  CurrencyCode,
   ExpenseComment,
   GroupInviteLink,
   Balance,
@@ -17,14 +18,13 @@ import type {
 /**
  * The data-access contract.
  *
- * Phase 1 ships a mock implementation backed by local state; Phase 2 will ship
- * a Supabase implementation of the exact same interface. Every method is async
- * and returns plain domain objects, so nothing in the UI has to change when
- * the implementation is swapped.
+ * Supabase implements it, and it is the only thing the UI is allowed to know
+ * about storage. Every method is async and returns plain domain objects, so a
+ * component never sees a database row.
  *
  * Note what is *not* here: no method accepts a balance. Balances are always
- * derived from expenses and settlements, never submitted by the client — which
- * is also how the Phase 2 RPCs will be shaped.
+ * derived from expenses and settlements, never submitted by the client, which
+ * is why the write RPCs are shaped the way they are.
  */
 
 export interface CreateGroupInput {
@@ -99,7 +99,35 @@ export interface GroupService {
 export type InviteResult =
   | { status: 'added'; member: GroupMember; user: User }
   | { status: 'already_member'; user: User }
-  | { status: 'pending'; email: string }
+  | { status: 'pending'; email: string; token: string }
+
+/**
+ * What a stranger holding an invitation token is allowed to see.
+ *
+ * Deliberately narrow: the group's name, who invited them, and how big it is.
+ * No member list, no other addresses, no amounts. The page has to say enough
+ * for the recipient to recognise the invitation as real, and nothing more.
+ */
+export type InvitationPreview =
+  | { status: 'invalid' }
+  | { status: 'accepted'; group_name: string }
+  | { status: 'expired'; group_name: string }
+  | {
+      status: 'valid'
+      group_id: string
+      group_name: string
+      currency: CurrencyCode
+      inviter_name: string
+      email: string
+      member_count: number
+    }
+
+export interface InvitationService {
+  /** Readable without a session: the recipient has no account yet. */
+  preview(token: string): Promise<InvitationPreview>
+  /** Joins the group the token points at. Returns the group id. */
+  accept(token: string): Promise<string>
+}
 
 export interface MemberService {
   listForGroup(groupId: string): Promise<Array<GroupMember & { user: User }>>
@@ -185,6 +213,7 @@ export interface DemoService {
 export interface DataServices {
   groups: GroupService
   members: MemberService
+  invitations: InvitationService
   inviteLinks: InviteLinkService
   expenses: ExpenseService
   comments: CommentService
