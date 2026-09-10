@@ -48,10 +48,20 @@ export interface AppState {
   /** Set when the last load failed, so the shell can show it rather than spin. */
   loadError: string | null
 
+  /**
+   * True from the moment sign-out is requested until the browser has left for
+   * /login. Ending a session involves at least one network round trip, and
+   * until this flag existed the shell went on rendering the signed-in page —
+   * names, balances and all — for the whole of it. The shell watches this so
+   * the workspace disappears on the click, not on the response.
+   */
+  signingOut: boolean
+
   apply: (recipe: (state: AppState) => void) => void
   hydrate: (snapshot: WorkspaceSnapshot) => void
   setLoadError: (message: string | null) => void
   clear: () => void
+  beginSignOut: () => void
 }
 
 const EMPTY_PREFERENCES: UserPreferences = {
@@ -72,6 +82,7 @@ function emptyState() {
     isAuthenticated: false,
     hydrated: false,
     loadError: null as string | null,
+    signingOut: false,
   }
 }
 
@@ -102,4 +113,9 @@ export const useAppStore = create<AppState>()((set) => ({
   setLoadError: (message) => set({ loadError: message, hydrated: true }),
 
   clear: () => set({ ...emptyState(), hydrated: true }),
+
+  // Same wipe as clear(), but latches the flag the shell reads. Kept separate
+  // because clear() also runs on an ordinary "no session" load, which must not
+  // put the app into the leaving-now state.
+  beginSignOut: () => set({ ...emptyState(), hydrated: true, signingOut: true }),
 }))

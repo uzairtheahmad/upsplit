@@ -155,9 +155,24 @@ function AppHeader() {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const hydrated = useAppStore((state) => state.hydrated)
   const loadError = useAppStore((state) => state.loadError)
+  const signingOut = useAppStore((state) => state.signingOut)
   const pathname = usePathname()
 
   useWorkspaceLoader()
+
+  // Checked before anything else, including loadError: once sign-out has been
+  // asked for, the browser is on its way to /login and nothing about the
+  // signed-in session should still be on screen while it gets there.
+  if (signingOut) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center" aria-busy>
+        <span className="sr-only" role="status">
+          Signing out
+        </span>
+        <span className="size-6 animate-spin rounded-full border-2 border-muted border-t-primary" />
+      </div>
+    )
+  }
 
   if (!hydrated) {
     return (
