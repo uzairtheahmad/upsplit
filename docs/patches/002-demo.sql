@@ -269,6 +269,16 @@ grant execute on function public.start_demo() to authenticated;
 
 
 -- =============================================================================
+-- 4. Tell PostgREST about the new function.
+--
+-- Supabase normally reloads its schema cache on DDL by itself, but the reload
+-- is asynchronous and can be missed. Asking explicitly costs nothing.
+-- =============================================================================
+
+notify pgrst, 'reload schema';
+
+
+-- =============================================================================
 -- Verify: expect one row, and three demo profiles.
 -- =============================================================================
 

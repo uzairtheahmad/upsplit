@@ -2480,6 +2480,11 @@ $$;
 
 grant execute on function public.start_demo() to authenticated;
 
+-- Supabase reloads its schema cache on DDL by itself, but the reload is
+-- asynchronous and can be missed, which leaves PostgREST reporting
+-- "Could not find the function public.start_demo". Asking explicitly is free.
+notify pgrst, 'reload schema';
+
 
 -- =============================================================================
 -- PART 9. BACKFILL PROFILES
