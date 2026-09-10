@@ -1,8 +1,17 @@
 'use client'
 
-import { LogOut, Monitor, Moon, RotateCcw, Sun, Trash2 } from 'lucide-react'
+import {
+  AlertTriangle,
+  KeyRound,
+  LogOut,
+  Monitor,
+  Moon,
+  RefreshCw,
+  Sun,
+  Trash2,
+  Upload,
+} from 'lucide-react'
 import { useTheme } from 'next-themes'
-import { useRouter } from 'next/navigation'
 import * as React from 'react'
 import { toast } from 'sonner'
 
@@ -27,18 +36,66 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { useCurrentUser, usePreferences } from '@/hooks/use-app-data'
-import { CURRENCIES, CURRENCY_CODES } from '@/lib/money/money'
-import { useAppStore } from '@/lib/store/app-store'
+import { useCurrentUser, useGlobalLedger, usePreferences } from '@/hooks/use-app-data'
+import { useRefreshWorkspace, useSignOut } from '@/hooks/use-session'
+import { CURRENCIES, CURRENCY_CODES, formatMoney } from '@/lib/money/money'
+import { createClient } from '@/lib/supabase/client'
 import { services } from '@/services'
 import type { CurrencyCode } from '@/types'
+
+/** Avatars are shown at 96px at most; 2 MB is generous for that. */
+const MAX_AVATAR_BYTES = 2 * 1024 * 1024
 
 function ProfileSection() {
   const user = useCurrentUser()
   const [name, setName] = React.useState(user?.name ?? '')
   const [email, setEmail] = React.useState(user?.email ?? '')
   const [saving, setSaving] = React.useState(false)
+  const [uploading, setUploading] = React.useState(false)
   const [errors, setErrors] = React.useState<{ name?: string; email?: string }>({})
+  const fileInput = React.useRef<HTMLInputElement>(null)
+
+  async function handleAvatar(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    // Reset immediately so picking the same file twice still fires onChange.
+    event.target.value = ''
+    if (!file) return
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('That file is not an image')
+      return
+    }
+    if (file.size > MAX_AVATAR_BYTES) {
+      toast.error('That image is too large', { description: 'Pick one under 2 MB.' })
+      return
+    }
+
+    setUploading(true)
+    try {
+      await services.profile.uploadAvatar(file)
+      toast.success('Photo updated')
+    } catch (error) {
+      toast.error('Could not upload that photo', {
+        description: error instanceof Error ? error.message : 'Please try again.',
+      })
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  async function handleRemoveAvatar() {
+    setUploading(true)
+    try {
+      await services.profile.removeAvatar()
+      toast.success('Photo removed')
+    } catch (error) {
+      toast.error('Could not remove that photo', {
+        description: error instanceof Error ? error.message : 'Please try again.',
+      })
+    } finally {
+      setUploading(false)
+    }
+  }
 
   React.useEffect(() => {
     setName(user?.name ?? '')
@@ -76,13 +133,40 @@ function ProfileSection() {
         <form onSubmit={handleSubmit} className="space-y-5" noValidate>
           <div className="flex items-center gap-4">
             <UserAvatar user={user} size="xl" />
-            <div className="space-y-1">
-              <Button type="button" variant="outline" size="sm" disabled>
-                Upload a photo
-              </Button>
+            <div className="space-y-1.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  loading={uploading}
+                  onClick={() => fileInput.current?.click()}
+                >
+                  <Upload aria-hidden />
+                  {user.avatarUrl ? 'Change photo' : 'Upload a photo'}
+                </Button>
+                {user.avatarUrl ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    disabled={uploading}
+                    onClick={handleRemoveAvatar}
+                  >
+                    Remove
+                  </Button>
+                ) : null}
+              </div>
               <p className="text-xs text-muted-foreground">
-                Avatar uploads arrive with the backend. Your initials are used until then.
+                JPG, PNG or WebP, up to 2 MB. Your initials are used until you add one.
               </p>
+              <input
+                ref={fileInput}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleAvatar}
+              />
             </div>
           </div>
 
@@ -223,10 +307,83 @@ function PreferencesSection() {
 }
 
 function AccountSection() {
-  const router = useRouter()
-  const signOut = useAppStore((state) => state.signOut)
-  const resetToSeed = useAppStore((state) => state.resetToSeed)
+  const signOut = useSignOut()
+  const refresh = useRefreshWorkspace()
+  const ledger = useGlobalLedger()
+
+  // Groups where this person still has money on the line, in either
+  // direction. Deleting an account with a live balance would strand the other
+  // side of that debt: the group's books would stop summing to zero and nobody
+  // could settle up.
+  //
+  // Counted in groups rather than summed into a single figure, because each
+  // group has its own currency and adding them together would be meaningless.
+  const unsettledGroups = ledger.perGroup.filter((entry) => entry.myNet !== 0)
+  const hasOutstanding = unsettledGroups.length > 0
   const [confirmOpen, setConfirmOpen] = React.useState(false)
+  const [passwordOpen, setPasswordOpen] = React.useState(false)
+  const [refreshing, setRefreshing] = React.useState(false)
+  const [deleting, setDeleting] = React.useState(false)
+  const [password, setPassword] = React.useState('')
+  const [confirmPassword, setConfirmPassword] = React.useState('')
+  const [passwordError, setPasswordError] = React.useState<string>()
+  const [savingPassword, setSavingPassword] = React.useState(false)
+
+  async function handleDeleteAccount() {
+    setDeleting(true)
+    try {
+      await services.profile.deleteAccount()
+      // The auth row still exists, so end the session explicitly — otherwise
+      // the next request would load a profile that no longer has a name.
+      await signOut()
+      toast.success('Your account has been deleted')
+    } catch (error) {
+      setDeleting(false)
+      toast.error('Could not delete your account', {
+        description: error instanceof Error ? error.message : 'Please try again.',
+      })
+    }
+  }
+
+  async function handleChangePassword(event: React.FormEvent) {
+    event.preventDefault()
+    if (password.length < 8) {
+      setPasswordError('Use at least 8 characters')
+      return
+    }
+    if (password !== confirmPassword) {
+      setPasswordError('Passwords don’t match')
+      return
+    }
+
+    setPasswordError(undefined)
+    setSavingPassword(true)
+
+    const { error } = await createClient().auth.updateUser({ password })
+    setSavingPassword(false)
+
+    if (error) {
+      setPasswordError(error.message)
+      return
+    }
+
+    setPasswordOpen(false)
+    setPassword('')
+    setConfirmPassword('')
+    toast.success('Password changed')
+  }
+
+  async function handleRefresh() {
+    setRefreshing(true)
+    try {
+      await refresh()
+      toast.success('Data refreshed')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not refresh')
+    } finally {
+      setRefreshing(false)
+    }
+  }
 
   return (
     <>
@@ -240,10 +397,11 @@ function AccountSection() {
             <div>
               <p className="text-sm font-medium">Change password</p>
               <p className="text-xs text-muted-foreground">
-                Available once authentication is connected.
+                Set a new password for this account.
               </p>
             </div>
-            <Button variant="outline" size="sm" disabled>
+            <Button variant="outline" size="sm" onClick={() => setPasswordOpen(true)}>
+              <KeyRound aria-hidden />
               Change password
             </Button>
           </div>
@@ -252,21 +410,14 @@ function AccountSection() {
 
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-sm font-medium">Reset demo data</p>
+              <p className="text-sm font-medium">Refresh data</p>
               <p className="text-xs text-muted-foreground">
-                Restore the sample groups and expenses, discarding your changes.
+                Re-read your groups, expenses and balances from the server.
               </p>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                resetToSeed()
-                toast.success('Demo data restored')
-              }}
-            >
-              <RotateCcw aria-hidden />
-              Reset
+            <Button variant="outline" size="sm" onClick={handleRefresh} loading={refreshing}>
+              <RefreshCw aria-hidden />
+              Refresh
             </Button>
           </div>
 
@@ -279,14 +430,7 @@ function AccountSection() {
                 End this session on the current device.
               </p>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                signOut()
-                router.push('/login')
-              }}
-            >
+            <Button variant="outline" size="sm" onClick={() => void signOut()}>
               <LogOut aria-hidden />
               Log out
             </Button>
@@ -298,11 +442,49 @@ function AccountSection() {
         <CardHeader>
           <CardTitle className="text-destructive">Delete account</CardTitle>
           <CardDescription>
-            Permanently removes your profile. Balances you’re part of must be settled first.
+            Permanently removes your profile. Every balance you’re part of must be settled
+            first.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <Button variant="destructive" size="sm" onClick={() => setConfirmOpen(true)}>
+        <CardContent className="space-y-3">
+          {hasOutstanding ? (
+            <div
+              role="status"
+              className="flex gap-2.5 rounded-lg border border-border bg-muted/40 p-3"
+            >
+              <AlertTriangle className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
+              <div className="space-y-1.5 text-sm">
+                <p className="font-medium text-foreground">
+                  You still have money outstanding
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Settle up in{' '}
+                  {unsettledGroups.length === 1
+                    ? 'this group'
+                    : `these ${unsettledGroups.length} groups`}{' '}
+                  before deleting your account:
+                </p>
+                <ul className="space-y-0.5 text-xs">
+                  {unsettledGroups.map((entry) => (
+                    <li key={entry.group.id} className="flex items-center gap-1.5">
+                      <span className="text-foreground">{entry.group.name}</span>
+                      <span className="text-muted-foreground">
+                        — you {entry.myNet > 0 ? 'are owed' : 'owe'}{' '}
+                        {formatMoney(Math.abs(entry.myNet), entry.group.currency)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          ) : null}
+
+          <Button
+            variant="destructive"
+            size="sm"
+            disabled={hasOutstanding}
+            onClick={() => setConfirmOpen(true)}
+          >
             <Trash2 aria-hidden />
             Delete my account
           </Button>
@@ -314,28 +496,74 @@ function AccountSection() {
           <DialogHeader>
             <DialogTitle>Delete your account?</DialogTitle>
           </DialogHeader>
-          <DialogBody>
+          <DialogBody className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              This is a demo, so nothing is actually deleted. In the real product this would remove
-              your profile and require every outstanding balance to be settled first.
+              Your balances are all settled, so deleting your account strands nobody.
             </p>
+            <p className="text-sm text-muted-foreground">
+              You’ll be removed from every group and your name and photo will be erased.
+              The expenses and settlements you recorded stay, because other people’s
+              balances depend on them — they’ll show as <em>Deleted user</em>.
+            </p>
+            <p className="text-sm text-muted-foreground">This cannot be undone.</p>
           </DialogBody>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setConfirmOpen(false)}>
+            <Button variant="ghost" onClick={() => setConfirmOpen(false)} disabled={deleting}>
               Cancel
             </Button>
             <Button
               variant="destructive"
-              onClick={() => {
-                setConfirmOpen(false)
-                toast.info('Nothing was deleted', {
-                  description: 'Account deletion arrives with the backend.',
-                })
-              }}
+              loading={deleting}
+              disabled={hasOutstanding}
+              onClick={handleDeleteAccount}
             >
               Delete account
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={passwordOpen} onOpenChange={setPasswordOpen}>
+        <DialogContent size="sm">
+          <DialogHeader>
+            <DialogTitle>Change your password</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleChangePassword}>
+            <DialogBody className="space-y-4">
+              <Field
+                label="New password"
+                htmlFor="new-password"
+                error={passwordError}
+                hint="At least 8 characters."
+              >
+                <Input
+                  id="new-password"
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  autoComplete="new-password"
+                  aria-invalid={passwordError ? true : undefined}
+                />
+              </Field>
+              <Field label="Confirm new password" htmlFor="confirm-password">
+                <Input
+                  id="confirm-password"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(event) => setConfirmPassword(event.target.value)}
+                  autoComplete="new-password"
+                />
+              </Field>
+            </DialogBody>
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => setPasswordOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" loading={savingPassword}>
+                Change password
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </>

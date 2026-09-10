@@ -39,6 +39,31 @@ describe('validateExpenseDraft', () => {
     expect(result.ok).toBe(true)
   })
 
+  it('rejects an expense that involves only one person', () => {
+    const result = validateExpenseDraft(
+      draft({
+        payments: [{ userId: UZAIR, amount: 300_000 }],
+        participants: [{ userId: UZAIR }],
+      }),
+      { memberIds: MEMBERS },
+    )
+    expect(result.ok).toBe(false)
+    expect(messages(result)).toContain('An expense has to involve at least two people')
+  })
+
+  it('counts a payer who is not a participant toward the two-person minimum', () => {
+    // Uzair pays for Ali's lunch and is not in the split. Two people are
+    // involved even though the split names one.
+    const result = validateExpenseDraft(
+      draft({
+        payments: [{ userId: UZAIR, amount: 300_000 }],
+        participants: [{ userId: ALI }],
+      }),
+      { memberIds: MEMBERS },
+    )
+    expect(result.ok).toBe(true)
+  })
+
   it('rejects a zero or negative amount', () => {
     expect(validateExpenseDraft(draft({ amount: 0 }), { memberIds: MEMBERS }).ok).toBe(false)
     expect(validateExpenseDraft(draft({ amount: -100 }), { memberIds: MEMBERS }).ok).toBe(false)
@@ -118,39 +143,6 @@ describe('validateSplit', () => {
     ])
     expect(exact.ok).toBe(true)
     expect(exact.difference).toBe(0)
-  })
-
-  it('requires percentages to add up to exactly 100%', () => {
-    const over = validateSplit('percentage', 100_000, [
-      { userId: UZAIR, value: 6000 },
-      { userId: ALI, value: 5000 },
-    ])
-    expect(over.ok).toBe(false)
-    expect(over.difference).toBe(1000)
-
-    expect(
-      validateSplit('percentage', 100_000, [
-        { userId: UZAIR, value: 5000 },
-        { userId: ALI, value: 3000 },
-        { userId: SHAHEER, value: 2000 },
-      ]).ok,
-    ).toBe(true)
-  })
-
-  it('requires at least one positive weight', () => {
-    expect(
-      validateSplit('weighted', 100_000, [
-        { userId: UZAIR, value: 0 },
-        { userId: ALI, value: 0 },
-      ]).ok,
-    ).toBe(false)
-
-    expect(
-      validateSplit('weighted', 100_000, [
-        { userId: UZAIR, value: 2 },
-        { userId: ALI, value: 1 },
-      ]).ok,
-    ).toBe(true)
   })
 
   it('rejects negative split values', () => {

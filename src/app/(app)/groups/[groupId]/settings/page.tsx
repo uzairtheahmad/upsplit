@@ -1,6 +1,6 @@
 'use client'
 
-import { Archive, ArchiveRestore, Check, Trash2 } from 'lucide-react'
+import { Archive, ArchiveRestore, Check, Lock, Trash2 } from 'lucide-react'
 import { useParams, useRouter } from 'next/navigation'
 import * as React from 'react'
 import { toast } from 'sonner'
@@ -18,23 +18,15 @@ import {
 import { Field, Input, Label, Textarea } from '@/components/ui/input'
 import { Separator } from '@/components/ui/misc'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import {
   GROUP_COLOR_KEYS,
   GROUP_ICON_KEYS,
   groupColor,
   groupIcon,
 } from '@/constants/categories'
 import { useGroup, useGroupLedger, useMyRole } from '@/hooks/use-app-data'
-import { CURRENCIES, CURRENCY_CODES } from '@/lib/money/money'
+import { CURRENCIES } from '@/lib/money/money'
 import { cn } from '@/lib/utils/cn'
 import { services } from '@/services'
-import type { CurrencyCode } from '@/types'
 
 export default function GroupSettingsPage() {
   const { groupId } = useParams<{ groupId: string }>()
@@ -45,7 +37,6 @@ export default function GroupSettingsPage() {
 
   const [name, setName] = React.useState(group?.name ?? '')
   const [description, setDescription] = React.useState(group?.description ?? '')
-  const [currency, setCurrency] = React.useState<CurrencyCode>(group?.currency ?? 'PKR')
   const [icon, setIcon] = React.useState(group?.icon ?? GROUP_ICON_KEYS[0])
   const [color, setColor] = React.useState(group?.color ?? GROUP_COLOR_KEYS[0])
   const [saving, setSaving] = React.useState(false)
@@ -55,7 +46,6 @@ export default function GroupSettingsPage() {
     if (!group) return
     setName(group.name)
     setDescription(group.description ?? '')
-    setCurrency(group.currency)
     setIcon(group.icon)
     setColor(group.color)
   }, [group])
@@ -65,7 +55,6 @@ export default function GroupSettingsPage() {
   const dirty =
     name !== group.name ||
     description !== (group.description ?? '') ||
-    currency !== group.currency ||
     icon !== group.icon ||
     color !== group.color
 
@@ -82,7 +71,6 @@ export default function GroupSettingsPage() {
       await services.groups.update(groupId, {
         name: name.trim(),
         description: description.trim() || undefined,
-        currency,
         icon,
         color,
       })
@@ -138,31 +126,30 @@ export default function GroupSettingsPage() {
                 />
               </Field>
 
+              {/*
+                * Currency is chosen when the group is created and fixed from
+                * then on. Every amount in the group is stored as an integer in
+                * this currency's minor units, with no exchange rate recorded —
+                * so switching it later would silently reinterpret every past
+                * expense as a different amount of money.
+                */}
               <Field
                 label="Currency"
                 htmlFor="group-settings-currency"
-                hint={
-                  ledger.expenses.length > 0
-                    ? 'Existing expenses keep the amounts they were recorded with.'
-                    : undefined
-                }
+                hint="Set when the group was created and cannot be changed."
               >
-                <Select
-                  value={currency}
-                  onValueChange={(value) => setCurrency(value as CurrencyCode)}
-                  disabled={!permissions.canManageGroup}
+                <div
+                  id="group-settings-currency"
+                  className="flex h-9 items-center gap-2 rounded-lg border border-input bg-muted/40 px-3 text-sm text-muted-foreground"
                 >
-                  <SelectTrigger id="group-settings-currency">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {CURRENCY_CODES.map((code) => (
-                      <SelectItem key={code} value={code}>
-                        {code} · {CURRENCIES[code].symbol}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  <Lock className="size-3.5 shrink-0" aria-hidden />
+                  <span className="text-foreground">
+                    {group.currency} · {CURRENCIES[group.currency].symbol}
+                  </span>
+                  <span className="sr-only">
+                    This group's currency is fixed and cannot be changed.
+                  </span>
+                </div>
               </Field>
 
               <div className="space-y-1.5">

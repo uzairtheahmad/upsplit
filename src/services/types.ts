@@ -1,5 +1,7 @@
 import type {
   AppNotification,
+  ExpenseComment,
+  GroupInviteLink,
   Balance,
   Expense,
   Group,
@@ -86,12 +88,48 @@ export interface GroupService {
   remove(id: string): Promise<void>
 }
 
+/**
+ * The outcome of inviting an email address.
+ *
+ * Invitations are by email only — a name is never asked for, because the name
+ * belongs to the account and is read from it. Someone who has not signed up
+ * yet cannot be added to a group, so the invitation is stored and claimed
+ * automatically when they register.
+ */
+export type InviteResult =
+  | { status: 'added'; member: GroupMember; user: User }
+  | { status: 'already_member'; user: User }
+  | { status: 'pending'; email: string }
+
 export interface MemberService {
   listForGroup(groupId: string): Promise<Array<GroupMember & { user: User }>>
   add(groupId: string, userId: string, role?: GroupRole): Promise<GroupMember>
-  invite(groupId: string, name: string, email: string): Promise<{ member: GroupMember; user: User }>
+  invite(groupId: string, email: string): Promise<InviteResult>
   updateRole(groupId: string, userId: string, role: GroupRole): Promise<GroupMember>
   remove(groupId: string, userId: string): Promise<void>
+  /**
+   * Hand the group to another member.
+   *
+   * Separate from `updateRole` because a group may have exactly one owner, so
+   * promoting a second one is impossible — the handover has to demote and
+   * promote in a single statement.
+   */
+  transferOwnership(groupId: string, userId: string): Promise<void>
+}
+
+export interface CommentService {
+  listForExpense(expenseId: string): Promise<ExpenseComment[]>
+  add(expenseId: string, body: string): Promise<ExpenseComment>
+}
+
+export interface InviteLinkService {
+  /** The group's current link, or null if none has been created. */
+  get(groupId: string): Promise<GroupInviteLink | null>
+  /** Creates the link, or rotates it — the previous token stops working. */
+  create(groupId: string, expiresAt?: string | null): Promise<GroupInviteLink>
+  revoke(groupId: string): Promise<void>
+  /** Joins the group the token belongs to. Returns that group's id. */
+  accept(token: string): Promise<string>
 }
 
 export interface ExpenseService {
@@ -125,12 +163,23 @@ export interface ProfileService {
   update(input: Partial<Pick<User, 'name' | 'email' | 'avatarUrl'>>): Promise<User>
   preferences(): Promise<UserPreferences>
   updatePreferences(input: Partial<UserPreferences>): Promise<UserPreferences>
+  /** Uploads to the avatars bucket and stores the URL. Returns the new URL. */
+  uploadAvatar(file: File): Promise<string>
+  removeAvatar(): Promise<void>
+  /**
+   * Anonymises the account: memberships dropped, profile scrubbed, financial
+   * history left intact so nobody else's balances move. Refuses while any
+   * balance is outstanding or a group you own still has other people in it.
+   */
+  deleteAccount(): Promise<void>
 }
 
 export interface DataServices {
   groups: GroupService
   members: MemberService
+  inviteLinks: InviteLinkService
   expenses: ExpenseService
+  comments: CommentService
   balances: BalanceService
   settlements: SettlementService
   notifications: NotificationService

@@ -73,21 +73,6 @@ export function spendingByMonth(expenses: Expense[], months: string[]): MonthlyT
   }))
 }
 
-export interface DailyTotal {
-  date: string
-  amount: Money
-}
-
-export function spendingByDay(expenses: Expense[]): DailyTotal[] {
-  const totals = new Map<string, Money>()
-  for (const expense of expenses) {
-    totals.set(expense.date, (totals.get(expense.date) ?? 0) + expense.amount)
-  }
-  return [...totals.entries()]
-    .map(([date, amount]) => ({ date, amount }))
-    .sort((a, b) => a.date.localeCompare(b.date))
-}
-
 export interface SpenderTotal {
   userId: string
   amount: Money

@@ -3,7 +3,6 @@
 import { ChevronsUpDown, LogOut, Monitor, Moon, Settings, Sun } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import * as React from 'react'
 
 import { UserAvatar } from '@/components/ui/avatar'
@@ -16,7 +15,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useCurrentUser } from '@/hooks/use-app-data'
-import { useAppStore } from '@/lib/store/app-store'
+import { useSignOut } from '@/hooks/use-session'
 import { cn } from '@/lib/utils/cn'
 
 const THEMES = [
@@ -27,8 +26,7 @@ const THEMES = [
 
 export function UserMenu({ compact }: { compact?: boolean }) {
   const user = useCurrentUser()
-  const router = useRouter()
-  const signOut = useAppStore((state) => state.signOut)
+  const signOut = useSignOut()
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = React.useState(false)
 
@@ -39,8 +37,7 @@ export function UserMenu({ compact }: { compact?: boolean }) {
   if (!user) return null
 
   function handleSignOut() {
-    signOut()
-    router.push('/login')
+    void signOut()
   }
 
   return (

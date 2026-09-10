@@ -27,7 +27,7 @@ export type ExpenseCategory =
   | 'education'
   | 'other'
 
-export type SplitMethod = 'equal' | 'exact' | 'percentage' | 'weighted'
+export type SplitMethod = 'equal' | 'exact'
 
 export type GroupRole = 'owner' | 'admin' | 'member'
 
@@ -71,10 +71,8 @@ export interface ExpensePayment {
  * Who is being charged, and the raw input that determines their share.
  *
  * `value` is interpreted by the expense's split method:
- *   equal      → ignored
- *   exact      → the person's share in minor units
- *   percentage → basis points (5000 = 50%), so percentages stay integers
- *   weighted   → an arbitrary positive weight
+ *   equal → ignored
+ *   exact → the person's share, in minor units
  */
 export interface ExpenseParticipant {
   userId: string
@@ -186,6 +184,32 @@ export interface ActivityEvent {
   createdAt: string
   /** Where clicking the activity should take the user, if anywhere. */
   href?: string
+}
+
+/** One message in an expense's thread. */
+export interface ExpenseComment {
+  id: string
+  expenseId: string
+  authorId: string
+  body: string
+  createdAt: string
+  updatedAt: string
+}
+
+/**
+ * The group's shareable join link.
+ *
+ * `token` is only ever known to people who can already see the group; joining
+ * takes the token alone, so a caller cannot name a group they were not given a
+ * link to.
+ */
+export interface GroupInviteLink {
+  groupId: string
+  token: string
+  createdBy: string
+  createdAt: string
+  expiresAt?: string | null
+  revokedAt?: string | null
 }
 
 export type NotificationKind = 'expense' | 'settlement' | 'group' | 'reminder'

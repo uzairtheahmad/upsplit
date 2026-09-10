@@ -2,7 +2,7 @@
 
 import { Menu, Plus, Search } from 'lucide-react'
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import * as React from 'react'
 
 import { useAppActions } from '@/components/layout/app-actions'
@@ -10,6 +10,7 @@ import { BrandLockup } from '@/components/layout/brand'
 import { DesktopSidebar, SidebarContent } from '@/components/layout/sidebar'
 import { UserMenu } from '@/components/layout/user-menu'
 import { NotificationBell } from '@/components/notifications/notification-bell'
+import { PageLoader } from '@/components/shared/states'
 import { Button } from '@/components/ui/button'
 import {
   Sheet,
@@ -19,6 +20,7 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet'
 import { MOBILE_NAV } from '@/constants/navigation'
+import { useWorkspaceLoader } from '@/hooks/use-session'
 import { useAppStore } from '@/lib/store/app-store'
 import { cn } from '@/lib/utils/cn'
 
@@ -142,18 +144,16 @@ function AppHeader() {
 /**
  * The authenticated shell.
  *
- * Also acts as the mock auth gate: unauthenticated visitors are bounced to
- * /login. In Phase 2 this becomes a real session check, most likely in
- * middleware, but the component boundary stays exactly where it is.
+ * Route protection lives in middleware, so anyone reaching this component
+ * already has a valid session. What happens here is the data load: the client
+ * cache is empty until the workspace comes back from Supabase.
  */
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const router = useRouter()
-  const isAuthenticated = useAppStore((state) => state.isAuthenticated)
   const hydrated = useAppStore((state) => state.hydrated)
+  const loadError = useAppStore((state) => state.loadError)
+  const pathname = usePathname()
 
-  React.useEffect(() => {
-    if (hydrated && !isAuthenticated) router.replace('/login')
-  }, [hydrated, isAuthenticated, router])
+  useWorkspaceLoader()
 
   if (!hydrated) {
     return (
@@ -164,7 +164,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     )
   }
 
-  if (!isAuthenticated) return null
+  if (loadError) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center p-6">
+        <div className="max-w-md space-y-3 text-center">
+          <h1 className="text-lg font-semibold text-foreground">Could not load your data</h1>
+          <p className="text-sm text-muted-foreground">{loadError}</p>
+          <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+            Try again
+          </Button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-dvh">
@@ -172,7 +184,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="lg:pl-64">
         <AppHeader />
         <main id="main" className="pb-24 lg:pb-0">
-          {children}
+          {/*
+            * Keyed by pathname so each route gets its own boundary. Without the
+            * key React reuses the previous one, which means it keeps the old
+            * page on screen while the next route's payload is still in flight —
+            * the navigation appears to hang, then jumps. A fresh boundary shows
+            * the spinner instead. When a route is already prefetched nothing
+            * suspends, so there is no flash.
+            */}
+          <React.Suspense key={pathname} fallback={<PageLoader />}>
+            {children}
+          </React.Suspense>
         </main>
       </div>
       <MobileNav />

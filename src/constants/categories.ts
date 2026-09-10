@@ -57,10 +57,6 @@ export function chartColor(index: number): string {
   return index >= 6 ? 'var(--chart-other)' : `var(--chart-${index + 1})`
 }
 
-export function categoryColor(key: ExpenseCategory): string {
-  return `var(--chart-${categoryMeta(key).chart})`
-}
-
 /** Icons a user can pick for a group. */
 export const GROUP_ICONS: Record<string, LucideIcon> = {
   users: Users,

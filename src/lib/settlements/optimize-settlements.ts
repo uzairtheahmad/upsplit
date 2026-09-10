@@ -1,4 +1,4 @@
-import type { Balance, Money, SettlementSuggestion } from '@/types'
+import type { Balance, SettlementSuggestion } from '@/types'
 
 /**
  * Debt simplification.
@@ -49,26 +49,4 @@ export function optimizeSettlements(balances: readonly Balance[]): SettlementSug
   }
 
   return suggestions
-}
-
-/** Only the suggestions that involve a particular person. */
-export function suggestionsFor(
-  suggestions: readonly SettlementSuggestion[],
-  userId: string,
-): SettlementSuggestion[] {
-  return suggestions.filter(
-    (suggestion) => suggestion.fromUserId === userId || suggestion.toUserId === userId,
-  )
-}
-
-/**
- * How many transfers the naive "settle every pair individually" approach would
- * need, so the UI can show what simplification actually saved.
- */
-export function transfersSaved(pairwiseCount: number, optimizedCount: number): number {
-  return Math.max(0, pairwiseCount - optimizedCount)
-}
-
-export function totalSuggested(suggestions: readonly SettlementSuggestion[]): Money {
-  return suggestions.reduce((sum, suggestion) => sum + suggestion.amount, 0)
 }

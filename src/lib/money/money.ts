@@ -122,10 +122,6 @@ export function currencySymbol(currency: CurrencyCode): string {
   return CURRENCIES[currency].symbol
 }
 
-export function sumMoney(amounts: readonly Money[]): Money {
-  return amounts.reduce((total, amount) => total + amount, 0)
-}
-
 /**
  * Split `total` across `weights` so that the parts sum *exactly* to the total.
  *

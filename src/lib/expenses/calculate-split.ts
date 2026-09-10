@@ -37,17 +37,11 @@ export interface SplitInput {
 export function calculateShares({ total, method, participants }: SplitInput): Share[] {
   if (participants.length === 0) return []
 
-  const weights = participants.map((participant) => {
-    switch (method) {
-      case 'equal':
-        return 1
-      case 'percentage':
-      case 'weighted':
-        return Math.max(0, participant.value ?? 0)
-      case 'exact':
-        return Math.max(0, participant.value ?? 0)
-    }
-  })
+  // An equal split weights everyone the same; an exact split uses the stated
+  // amounts as the weights, which keeps both methods on one code path.
+  const weights = participants.map((participant) =>
+    method === 'equal' ? 1 : Math.max(0, participant.value ?? 0),
+  )
 
   if (method === 'exact') {
     const stated = weights.reduce((sum, weight) => sum + weight, 0)
@@ -178,23 +172,8 @@ export function buildParticipants(
     return userIds.map((userId) => ({ userId }))
   }
 
-  if (method === 'weighted') {
-    return userIds.map((userId) => ({
-      userId,
-      value: previousByUser.get(userId)?.value ?? 1,
-    }))
-  }
-
-  if (method === 'percentage') {
-    // Seed with an even percentage split in basis points so the form opens in
-    // a valid state rather than at zero.
-    const even = allocate(10_000, userIds.map(() => 1))
-    return userIds.map((userId, index) => ({
-      userId,
-      value: previousByUser.get(userId)?.value ?? even[index],
-    }))
-  }
-
+  // Exact: seed with an even split so the form opens balanced rather than at
+  // zero, and the user edits from there.
   const even = allocate(total, userIds.map(() => 1))
   return userIds.map((userId, index) => ({
     userId,
@@ -205,13 +184,9 @@ export function buildParticipants(
 export const SPLIT_METHOD_LABELS: Record<SplitMethod, string> = {
   equal: 'Equally',
   exact: 'Exact amounts',
-  percentage: 'Percentages',
-  weighted: 'By shares',
 }
 
 export const SPLIT_METHOD_DESCRIPTIONS: Record<SplitMethod, string> = {
   equal: 'Everyone selected pays the same amount.',
   exact: 'Type exactly what each person owes.',
-  percentage: 'Assign each person a percentage of the total.',
-  weighted: 'Give people shares — 2 shares pays double 1 share.',
 }

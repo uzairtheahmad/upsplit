@@ -214,6 +214,35 @@
     outline-offset: 2px;
   }
 
+  /*
+   * Tailwind v4 no longer sets `cursor: pointer` on buttons — its preflight
+   * defers to the browser default, which is `default`. Restoring it here
+   * rather than on each component means every clickable thing gets it,
+   * including Radix triggers and menu items that render their own elements.
+   */
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']),
+  [role='menuitem']:not([data-disabled]),
+  [role='menuitemcheckbox']:not([data-disabled]),
+  [role='menuitemradio']:not([data-disabled]),
+  [role='option']:not([data-disabled]),
+  [role='tab']:not([data-disabled]),
+  [role='switch']:not(:disabled),
+  [role='checkbox']:not(:disabled),
+  [role='radio']:not(:disabled),
+  a[href],
+  label[for],
+  summary {
+    cursor: pointer;
+  }
+
+  /* A disabled control should say so, not silently ignore the click. */
+  button:disabled,
+  [aria-disabled='true'],
+  [data-disabled] {
+    cursor: not-allowed;
+  }
+
   ::selection {
     background-color: var(--primary-muted);
     color: var(--foreground);

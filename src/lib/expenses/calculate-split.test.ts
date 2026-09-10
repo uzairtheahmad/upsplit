@@ -173,63 +173,6 @@ describe('exact split', () => {
   })
 })
 
-describe('percentage split', () => {
-  it('charges each person their percentage of the total', () => {
-    const shares = calculateShares({
-      total: 100_000,
-      method: 'percentage',
-      participants: [
-        { userId: UZAIR, value: 5000 },
-        { userId: ALI, value: 3000 },
-        { userId: SHAHEER, value: 2000 },
-      ],
-    })
-    expect(shares.map((share) => share.amount)).toEqual([50_000, 30_000, 20_000])
-  })
-
-  it('sums exactly even when the percentages do not divide cleanly', () => {
-    const shares = calculateShares({
-      total: 10_000,
-      method: 'percentage',
-      participants: [
-        { userId: UZAIR, value: 3333 },
-        { userId: ALI, value: 3333 },
-        { userId: SHAHEER, value: 3334 },
-      ],
-    })
-    expect(shares.reduce((sum, share) => sum + share.amount, 0)).toBe(10_000)
-  })
-})
-
-describe('weighted split', () => {
-  it('charges in proportion to shares', () => {
-    const shares = calculateShares({
-      total: 100_000,
-      method: 'weighted',
-      participants: [
-        { userId: UZAIR, value: 2 },
-        { userId: ALI, value: 1 },
-        { userId: SHAHEER, value: 1 },
-      ],
-    })
-    expect(shares.map((share) => share.amount)).toEqual([50_000, 25_000, 25_000])
-  })
-
-  it('excludes a zero-weight participant from the charge', () => {
-    const shares = calculateShares({
-      total: 100_000,
-      method: 'weighted',
-      participants: [
-        { userId: UZAIR, value: 1 },
-        { userId: ALI, value: 1 },
-        { userId: SHAHEER, value: 0 },
-      ],
-    })
-    expect(shares.find((share) => share.userId === SHAHEER)?.amount).toBe(0)
-    expect(shares.reduce((sum, share) => sum + share.amount, 0)).toBe(100_000)
-  })
-})
-
 describe('edge cases', () => {
   it('returns no shares when there are no participants', () => {
     expect(calculateShares({ total: 100_000, method: 'equal', participants: [] })).toEqual([])
@@ -250,7 +193,7 @@ describe('edge cases', () => {
 })
 
 describe('zero-sum invariant', () => {
-  const methods: SplitMethod[] = ['equal', 'exact', 'percentage', 'weighted']
+  const methods: SplitMethod[] = ['equal', 'exact']
 
   it('holds across every method, awkward total, and participant count', () => {
     for (const method of methods) {
@@ -259,12 +202,7 @@ describe('zero-sum invariant', () => {
           const people = [UZAIR, ALI, SHAHEER, NAVEED, 'u_hadi', 'u_abdullah'].slice(0, count)
           const participants: ExpenseParticipant[] = people.map((userId, index) => ({
             userId,
-            value:
-              method === 'exact'
-                ? Math.floor(total / count)
-                : method === 'percentage'
-                  ? Math.floor(10_000 / count)
-                  : index + 1,
+            value: method === 'exact' ? Math.floor(total / count) : index + 1,
           }))
           expectZeroSum(expense(total, method, [[UZAIR, total]], participants))
         }
@@ -276,7 +214,7 @@ describe('zero-sum invariant', () => {
     expectZeroSum(
       expense(
         333_333,
-        'weighted',
+        'exact',
         [
           [UZAIR, 111_111],
           [ALI, 222_222],

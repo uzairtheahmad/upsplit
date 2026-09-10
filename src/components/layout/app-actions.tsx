@@ -2,6 +2,7 @@
 
 import { useParams } from 'next/navigation'
 import * as React from 'react'
+import { toast } from 'sonner'
 
 import { AddExpenseDialog } from '@/components/expenses/expense-dialogs'
 import { CreateGroupDialog, InviteMemberDialog } from '@/components/groups/group-dialogs'
@@ -10,6 +11,7 @@ import {
   type SettlementPrefill,
 } from '@/components/settlements/record-settlement-dialog'
 import { useMyGroups } from '@/hooks/use-app-data'
+import { useAppStore } from '@/lib/store/app-store'
 
 /**
  * One place that owns the app's global dialogs.
@@ -39,6 +41,7 @@ export function useAppActions(): AppActions {
 export function AppActionsProvider({ children }: { children: React.ReactNode }) {
   const params = useParams<{ groupId?: string }>()
   const groups = useMyGroups()
+  const memberships = useAppStore((state) => state.members)
 
   // Default to the group the user is currently looking at.
   const contextualGroupId = params?.groupId ?? groups[0]?.id
@@ -55,7 +58,24 @@ export function AppActionsProvider({ children }: { children: React.ReactNode }) 
     () => ({
       defaultGroupId: contextualGroupId,
       addExpense: (groupId) => {
-        setExpenseGroupId(groupId ?? contextualGroupId)
+        const target = groupId ?? contextualGroupId
+        if (!target) return
+
+        // R2: an expense needs two people, so a group of one has nothing to
+        // share. Opening the form would only lead to a submit that cannot
+        // succeed — offer the thing they actually need instead.
+        const size = memberships.filter((member) => member.groupId === target).length
+        if (size < 2) {
+          toast.info('Invite someone first', {
+            description:
+              'An expense is split between at least two people, so this group needs another member.',
+          })
+          setInviteGroupId(target)
+          setInviteOpen(true)
+          return
+        }
+
+        setExpenseGroupId(target)
         setExpenseOpen(true)
       },
       createGroup: () => setGroupOpen(true),
@@ -68,7 +88,7 @@ export function AppActionsProvider({ children }: { children: React.ReactNode }) 
         setInviteOpen(true)
       },
     }),
-    [contextualGroupId],
+    [contextualGroupId, memberships],
   )
 
   const activeExpenseGroup = expenseGroupId ?? contextualGroupId

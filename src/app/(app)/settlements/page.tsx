@@ -1,6 +1,6 @@
 'use client'
 
-import { ArrowLeftRight, Sparkles } from 'lucide-react'
+import { ArrowLeftRight } from 'lucide-react'
 
 import { useAppActions } from '@/components/layout/app-actions'
 import { PageContainer, PageHeader, SectionHeader } from '@/components/shared/page-header'

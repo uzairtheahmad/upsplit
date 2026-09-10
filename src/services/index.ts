@@ -1,15 +1,12 @@
-import { mockServices } from './mock/mock-services'
+import { supabaseServices } from './supabase/supabase-services'
 import type { DataServices } from './types'
 
 /**
  * The one place the app chooses a data implementation.
  *
- * Phase 2 changes exactly this line:
- *
- *     export const services: DataServices = supabaseServices
- *
- * Nothing that imports `services` needs to know which one it got.
+ * The Phase 1 mock lives on in ./mock for reference, but the app now talks to
+ * Supabase. Nothing that imports `services` knows which one it got.
  */
-export const services: DataServices = mockServices
+export const services: DataServices = supabaseServices
 
 export * from './types'

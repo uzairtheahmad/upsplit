@@ -114,4 +114,32 @@ function ChartSkeleton({ className }: { className?: string }) {
   )
 }
 
-export { ChartSkeleton, EmptyState, ErrorState, ListRowSkeleton, ListSkeleton, StatCardSkeleton }
+/**
+ * The spinner shown in the content area while a route is being fetched.
+ *
+ * Sized to roughly the height of a page so the header and sidebar stay put and
+ * the layout does not collapse and jump when the real content arrives.
+ */
+function PageLoader({ label = 'Loading' }: { label?: string }) {
+  return (
+    <div className="flex min-h-[60vh] items-center justify-center" aria-busy>
+      <span
+        className="size-6 animate-spin rounded-full border-2 border-muted border-t-primary"
+        aria-hidden
+      />
+      <span className="sr-only" role="status">
+        {label}
+      </span>
+    </div>
+  )
+}
+
+export {
+  ChartSkeleton,
+  EmptyState,
+  ErrorState,
+  ListRowSkeleton,
+  ListSkeleton,
+  PageLoader,
+  StatCardSkeleton,
+}

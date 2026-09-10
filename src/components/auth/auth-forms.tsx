@@ -2,23 +2,22 @@
 
 import { CheckCircle2, Eye, EyeOff } from 'lucide-react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import * as React from 'react'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
 import { Field, Input, Label } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/misc'
-import { useAppStore } from '@/lib/store/app-store'
-import { CURRENT_USER_ID, seedUsers } from '@/services/mock/seed'
+import { createClient } from '@/lib/supabase/client'
 
 /**
- * Mock authentication.
+ * Supabase authentication.
  *
- * No credentials are checked and nothing leaves the browser — this exists so
- * the full sign-up → dashboard journey is walkable in Phase 1. Every field is
- * validated the way the real forms will be, so swapping in Supabase Auth in
- * Phase 2 is a change of submit handler, not a rewrite.
+ * The client-side validation here is a courtesy to the user; Supabase is the
+ * thing that actually decides. Errors from it are surfaced verbatim rather
+ * than replaced with a generic message, because "Email not confirmed" and
+ * "Invalid login credentials" need different actions from the user.
  */
 
 const EMAIL_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
@@ -66,11 +65,10 @@ function PasswordInput({
 
 export function LoginForm() {
   const router = useRouter()
-  const signIn = useAppStore((state) => state.signIn)
+  const searchParams = useSearchParams()
 
-  const demoUser = seedUsers.find((user) => user.id === CURRENT_USER_ID)
-  const [email, setEmail] = React.useState(demoUser?.email ?? '')
-  const [password, setPassword] = React.useState('demo1234')
+  const [email, setEmail] = React.useState('')
+  const [password, setPassword] = React.useState('')
   const [remember, setRemember] = React.useState(true)
   const [errors, setErrors] = React.useState<{ email?: string; password?: string }>({})
   const [loading, setLoading] = React.useState(false)
@@ -84,10 +82,24 @@ export function LoginForm() {
     if (Object.keys(next).length > 0) return
 
     setLoading(true)
-    await new Promise((resolve) => setTimeout(resolve, 500))
-    signIn(email)
+    const supabase = createClient()
+    const { error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    })
+
+    if (error) {
+      setLoading(false)
+      setErrors({ password: error.message })
+      return
+    }
+
     toast.success('Welcome back')
-    router.push('/dashboard')
+    // Middleware set ?next when it bounced an unauthenticated visitor, so
+    // signing in returns them to the page they actually asked for.
+    const destination = searchParams.get('next') || '/dashboard'
+    router.replace(destination)
+    router.refresh()
   }
 
   return (
@@ -149,11 +161,6 @@ export function LoginForm() {
         </Button>
       </form>
 
-      <p className="rounded-lg border border-dashed border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-        This is a demo — any email and an 8-character password will get you in. Use one of the
-        seeded addresses to see the app as that person.
-      </p>
-
       <p className="text-center text-sm text-muted-foreground">
         New here?{' '}
         <Link href="/signup" className="font-medium text-primary underline-offset-4 hover:underline">
@@ -166,7 +173,6 @@ export function LoginForm() {
 
 export function SignupForm() {
   const router = useRouter()
-  const signIn = useAppStore((state) => state.signIn)
 
   const [name, setName] = React.useState('')
   const [email, setEmail] = React.useState('')
@@ -188,12 +194,34 @@ export function SignupForm() {
     if (Object.keys(next).length > 0) return
 
     setLoading(true)
-    await new Promise((resolve) => setTimeout(resolve, 600))
-    // The demo signs into the seeded account so the new user lands on a
-    // dashboard with something in it rather than an empty shell.
-    signIn()
+    const supabase = createClient()
+    // full_name is read by the on_auth_user_created trigger to populate the
+    // profiles row, so the name has to travel with the signup.
+    const { data, error } = await supabase.auth.signUp({
+      email: email.trim(),
+      password,
+      options: { data: { full_name: name.trim() } },
+    })
+
+    if (error) {
+      setLoading(false)
+      setErrors({ email: error.message })
+      return
+    }
+
+    // With email confirmation on, signUp returns a user but no session.
+    if (!data.session) {
+      setLoading(false)
+      toast.success('Check your inbox', {
+        description: 'Confirm your email address to finish signing up.',
+      })
+      router.push('/login')
+      return
+    }
+
     toast.success('Account created', { description: 'Welcome to UpSplit.' })
-    router.push('/dashboard')
+    router.replace('/dashboard')
+    router.refresh()
   }
 
   return (
@@ -305,8 +333,21 @@ export function ForgotPasswordForm() {
     }
     setError(undefined)
     setLoading(true)
-    await new Promise((resolve) => setTimeout(resolve, 600))
+
+    const supabase = createClient()
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: `${window.location.origin}/auth/callback?next=/settings`,
+    })
+
     setLoading(false)
+
+    if (resetError) {
+      setError(resetError.message)
+      return
+    }
+
+    // Shown whether or not the address exists, so this cannot be used to
+    // discover which emails have accounts.
     setSent(true)
   }
 

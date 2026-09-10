@@ -277,9 +277,8 @@ export function InviteMemberDialog({
 }) {
   const users = useUsers()
   const members = useGroupMembers(groupId)
-  const [name, setName] = React.useState('')
   const [email, setEmail] = React.useState('')
-  const [errors, setErrors] = React.useState<{ name?: string; email?: string }>({})
+  const [errors, setErrors] = React.useState<{ email?: string }>({})
   const [saving, setSaving] = React.useState(false)
 
   const memberIds = new Set(members.map((member) => member.userId))
@@ -300,16 +299,31 @@ export function InviteMemberDialog({
   async function handleInvite(event: React.FormEvent) {
     event.preventDefault()
     const next: typeof errors = {}
-    if (name.trim().length < 2) next.name = 'Enter their name'
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())) next.email = 'Enter a valid email address'
     setErrors(next)
     if (Object.keys(next).length > 0) return
 
     setSaving(true)
     try {
-      await services.members.invite(groupId, name, email)
-      toast.success('Invitation sent', { description: `${name.trim()} was added to the group.` })
-      setName('')
+      const result = await services.members.invite(groupId, email)
+
+      if (result.status === 'added') {
+        toast.success('Member added', {
+          description: `${result.user.name} joined the group.`,
+        })
+      } else if (result.status === 'already_member') {
+        toast.info('Already in the group', {
+          description: `${result.user.name} is already a member.`,
+        })
+      } else {
+        // No account yet. The invitation is stored, and the signup trigger
+        // turns it into membership the moment they register.
+        toast.success('Invitation saved', {
+          description: `${result.email} needs to sign up first — they'll join this group automatically when they do.`,
+          duration: 8000,
+        })
+      }
+
       setEmail('')
       onOpenChange(false)
     } catch (error) {
@@ -327,22 +341,13 @@ export function InviteMemberDialog({
         <DialogHeader>
           <DialogTitle>Invite someone</DialogTitle>
           <DialogDescription>
-            Add a person by email, or pick someone you already share a group with.
+            Invite by email. If they already have an UpSplit account they join
+            straight away; if not, they'll be added as soon as they sign up.
           </DialogDescription>
         </DialogHeader>
 
         <DialogBody className="space-y-5">
           <form onSubmit={handleInvite} id="invite-form" className="space-y-4" noValidate>
-            <Field label="Full name" htmlFor="invite-name" error={errors.name}>
-              <Input
-                id="invite-name"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                placeholder="Hadi Malik"
-                autoFocus
-                autoComplete="off"
-              />
-            </Field>
             <Field label="Email" htmlFor="invite-email" error={errors.email}>
               <Input
                 id="invite-email"
@@ -350,6 +355,7 @@ export function InviteMemberDialog({
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 placeholder="hadi@example.com"
+                autoFocus
                 autoComplete="off"
               />
             </Field>

@@ -19,10 +19,6 @@ import type { Expense, Group, Settlement, User } from '@/types'
  * Nothing derived is ever stored, so a balance cannot go stale.
  */
 
-export function useHydrated(): boolean {
-  return useAppStore((state) => state.hydrated)
-}
-
 export function useCurrentUserId(): string {
   return useAppStore((state) => state.currentUserId)
 }

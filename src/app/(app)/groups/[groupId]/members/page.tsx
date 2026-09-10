@@ -1,9 +1,10 @@
 'use client'
 
-import { MoreHorizontal, ShieldCheck, UserMinus, UserPlus } from 'lucide-react'
+import { Crown, MoreHorizontal, ShieldCheck, UserMinus, UserPlus } from 'lucide-react'
 import { useParams } from 'next/navigation'
 import { toast } from 'sonner'
 
+import { InviteLinkPanel } from '@/components/groups/invite-link-panel'
 import { useAppActions } from '@/components/layout/app-actions'
 import { Amount } from '@/components/shared/money'
 import { SectionHeader } from '@/components/shared/page-header'
@@ -55,6 +56,19 @@ export default function GroupMembersPage() {
       toast.success('Role updated')
     } catch (error) {
       toast.error('Could not update the role', {
+        description: error instanceof Error ? error.message : 'Please try again.',
+      })
+    }
+  }
+
+  async function handOver(userId: string, name: string) {
+    try {
+      await services.members.transferOwnership(groupId, userId)
+      toast.success('Group handed over', {
+        description: `${name} is now the owner. You are an admin.`,
+      })
+    } catch (error) {
+      toast.error('Could not hand over the group', {
         description: error instanceof Error ? error.message : 'Please try again.',
       })
     }
@@ -162,6 +176,24 @@ export default function GroupMembersPage() {
                         </span>
                       </DropdownMenuItem>
                     ))}
+                    {permissions.isOwner ? (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuLabel>Ownership</DropdownMenuLabel>
+                        <DropdownMenuItem
+                          onSelect={() => handOver(member.userId, member.user.name)}
+                        >
+                          <Crown aria-hidden />
+                          <span className="min-w-0">
+                            <span className="block">Make owner</span>
+                            <span className="block text-xs text-muted-foreground">
+                              You become an admin. A group has one owner.
+                            </span>
+                          </span>
+                        </DropdownMenuItem>
+                      </>
+                    ) : null}
+
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       destructive
@@ -184,6 +216,8 @@ export default function GroupMembersPage() {
         Someone with an outstanding balance can’t be removed — settle up with them first, so the
         group’s books stay balanced.
       </p>
+
+      <InviteLinkPanel groupId={groupId} canManage={permissions.canManageMembers} />
     </div>
   )
 }

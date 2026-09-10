@@ -10,7 +10,6 @@ import {
   startOfMonth,
   startOfWeek,
   startOfYear,
-  subDays,
   subMonths,
 } from 'date-fns'
 
@@ -105,10 +104,6 @@ export function formatDateLong(iso: string): string {
   return format(parseISO(iso), 'd MMMM yyyy')
 }
 
-export function formatMonthLabel(iso: string): string {
-  return format(parseISO(iso), 'MMM')
-}
-
 export function monthKey(iso: string): string {
   return format(parseISO(iso), 'yyyy-MM')
 }
@@ -122,10 +117,6 @@ export function recentMonthKeys(count: number, now: Date = new Date()): string[]
 
 export function monthKeyLabel(key: string): string {
   return format(parseISO(`${key}-01`), 'MMM yyyy')
-}
-
-export function daysAgoISO(days: number, now: Date = new Date()): string {
-  return toISODate(subDays(now, days))
 }
 
 export function greeting(now: Date = new Date()): string {

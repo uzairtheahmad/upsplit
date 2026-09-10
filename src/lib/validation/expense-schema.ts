@@ -17,7 +17,7 @@ export const EXPENSE_CATEGORIES = [
   'other',
 ] as const
 
-export const SPLIT_METHODS = ['equal', 'exact', 'percentage', 'weighted'] as const
+export const SPLIT_METHODS = ['equal', 'exact'] as const
 
 const isoDate = z
   .string()
@@ -72,8 +72,8 @@ export interface SplitValidation {
   ok: boolean
   issues: ValidationIssue[]
   /**
-   * For exact splits: stated total − expense total. For percentage splits:
-   * stated basis points − 10,000. Zero when the split balances.
+   * For exact splits: stated total − expense total. Zero when the split
+   * balances, and always zero for an equal split.
    */
   difference: number
 }
@@ -108,36 +108,19 @@ export function validateSplit(
     issues.push({ field: 'split', message: 'Split values cannot be negative' })
   }
 
-  if (method === 'exact') {
-    const stated = values.reduce((sum, value) => sum + value, 0)
-    const difference = stated - total
-    if (difference !== 0) {
-      issues.push({
-        field: 'split',
-        message:
-          difference > 0
-            ? 'The exact amounts add up to more than the total'
-            : 'The exact amounts do not add up to the total yet',
-      })
-    }
-    return { ok: issues.length === 0, difference, issues }
+  // exact
+  const stated = values.reduce((sum, value) => sum + value, 0)
+  const difference = stated - total
+  if (difference !== 0) {
+    issues.push({
+      field: 'split',
+      message:
+        difference > 0
+          ? 'The exact amounts add up to more than the total'
+          : 'The exact amounts do not add up to the total yet',
+    })
   }
-
-  if (method === 'percentage') {
-    const stated = values.reduce((sum, value) => sum + value, 0)
-    const difference = stated - 10_000
-    if (difference !== 0) {
-      issues.push({ field: 'split', message: 'Percentages must add up to exactly 100%' })
-    }
-    return { ok: issues.length === 0, difference, issues }
-  }
-
-  // weighted
-  const totalWeight = values.reduce((sum, value) => sum + value, 0)
-  if (totalWeight <= 0) {
-    issues.push({ field: 'split', message: 'Give at least one person a share above zero' })
-  }
-  return { ok: issues.length === 0, difference: 0, issues }
+  return { ok: issues.length === 0, difference, issues }
 }
 
 export interface ExpenseValidationContext {
@@ -196,6 +179,20 @@ export function validateExpenseDraft(
   }
   if (new Set(value.participants.map((p) => p.userId)).size !== value.participants.length) {
     issues.push({ field: 'participants', message: 'Each participant can only be listed once' })
+  }
+
+  // An expense is by definition shared. Payers and participants are counted
+  // together so that paying for someone else still qualifies — that is two
+  // people even though the split names only one.
+  const involved = new Set([
+    ...value.payments.map((payment) => payment.userId),
+    ...value.participants.map((participant) => participant.userId),
+  ])
+  if (involved.size < 2) {
+    issues.push({
+      field: 'participants',
+      message: 'An expense has to involve at least two people',
+    })
   }
 
   issues.push(

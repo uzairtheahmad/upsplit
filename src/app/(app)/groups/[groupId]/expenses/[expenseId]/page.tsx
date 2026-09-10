@@ -6,6 +6,7 @@ import { useParams, useRouter } from 'next/navigation'
 import * as React from 'react'
 
 import { DeleteExpenseDialog, EditExpenseDialog } from '@/components/expenses/expense-dialogs'
+import { ExpenseComments } from '@/components/expenses/expense-comments'
 import { CategoryIconChip } from '@/components/expenses/form/category-selector'
 import { Amount } from '@/components/shared/money'
 import { EmptyState } from '@/components/shared/states'
@@ -206,6 +207,8 @@ export default function ExpenseDetailPage() {
               </div>
             </CardContent>
           </Card>
+
+          <ExpenseComments expenseId={expense.id} />
         </div>
 
         <div className="min-w-0 space-y-5">

@@ -1,6 +1,6 @@
 'use client'
 
-import { AlertTriangle, Equal, Hash, Percent, SlidersHorizontal } from 'lucide-react'
+import { AlertTriangle, Equal, Hash } from 'lucide-react'
 import * as React from 'react'
 
 import { UserAvatar } from '@/components/ui/avatar'
@@ -24,11 +24,9 @@ import type {
 const METHOD_ICONS: Record<SplitMethod, React.ElementType> = {
   equal: Equal,
   exact: Hash,
-  percentage: Percent,
-  weighted: SlidersHorizontal,
 }
 
-const METHODS: SplitMethod[] = ['equal', 'exact', 'percentage', 'weighted']
+const METHODS: SplitMethod[] = ['equal', 'exact']
 
 export function SplitMethodSelector({
   value,
@@ -40,7 +38,7 @@ export function SplitMethodSelector({
   return (
     <fieldset className="space-y-2">
       <legend className="text-sm font-medium leading-none text-foreground">Split</legend>
-      <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-1.5">
         {METHODS.map((method) => {
           const Icon = METHOD_ICONS[method]
           const selected = value === method
@@ -105,7 +103,7 @@ export function SplitEditor({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <Label>{method === 'weighted' ? 'Shares' : method === 'exact' ? 'Exact amounts' : 'Percentages'}</Label>
+        <Label>Exact amounts</Label>
         <SplitDifference method={method} validation={validation} currency={currency} />
       </div>
 
@@ -131,21 +129,11 @@ export function SplitEditor({
                 onChange={(next) => onValueChange(participant.userId, next)}
               />
 
-              {method !== 'exact' ? (
-                <span className="tabular w-24 shrink-0 text-right text-xs text-muted-foreground">
-                  {formatMoney(shareMap.get(participant.userId) ?? 0, currency)}
-                </span>
-              ) : null}
             </div>
           )
         })}
       </div>
 
-      {method === 'weighted' ? (
-        <p className="text-xs text-muted-foreground">
-          Someone with 2 shares pays twice what someone with 1 share pays.
-        </p>
-      ) : null}
       {method === 'exact' && total > 0 ? (
         <p className="text-xs text-muted-foreground">
           Must add up to {formatMoney(total, currency)}.
@@ -170,59 +158,30 @@ function SplitValueInput({
   name: string
   onChange: (value: number | undefined) => void
 }) {
-  // Percentages are stored as basis points and weights as plain integers, so
-  // each method needs its own text projection.
-  const text =
-    method === 'exact'
-      ? value === undefined
-        ? ''
-        : toMajorString(value, currency)
-      : method === 'percentage'
-        ? value === undefined
-          ? ''
-          : String(Math.round((value / 100) * 100) / 100)
-        : value === undefined
-          ? ''
-          : String(value)
+  const text = value === undefined ? '' : toMajorString(value, currency)
 
   function handleChange(event: React.ChangeEvent<HTMLInputElement>) {
     const raw = event.target.value
     if (raw === '') return onChange(undefined)
-
-    if (method === 'exact') {
-      const parsed = parseMoney(raw, currency)
-      return onChange(parsed ?? undefined)
-    }
-
-    const numeric = Number(raw)
-    if (Number.isNaN(numeric) || numeric < 0) return
-
-    if (method === 'percentage') return onChange(Math.round(numeric * 100))
-    return onChange(numeric)
+    const parsed = parseMoney(raw, currency)
+    return onChange(parsed ?? undefined)
   }
 
-  const affix =
-    method === 'exact' ? currencySymbol(currency) : method === 'percentage' ? '%' : '×'
+  const affix = currencySymbol(currency)
 
   return (
     <div className="relative w-28 shrink-0">
-      {method === 'exact' ? (
-        <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-          {affix}
-        </span>
-      ) : (
-        <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-          {affix}
-        </span>
-      )}
+      <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+        {affix}
+      </span>
       <Input
         id={id}
         inputMode="decimal"
         value={text}
         onChange={handleChange}
         placeholder="0"
-        aria-label={`${method === 'weighted' ? 'Shares' : method === 'exact' ? 'Amount' : 'Percentage'} for ${name}`}
-        className={cn('tabular h-8 text-sm', method === 'exact' ? 'pl-8 text-right' : 'pr-7 text-right')}
+        aria-label={`Amount for ${name}`}
+        className={cn('tabular h-8 text-sm', 'pl-8 text-right')}
       />
     </div>
   )
@@ -242,11 +201,7 @@ function SplitDifference({
   }
 
   const over = validation.difference > 0
-  const magnitude = Math.abs(validation.difference)
-  const text =
-    method === 'percentage'
-      ? `${Math.round((magnitude / 100) * 100) / 100}%`
-      : formatMoney(magnitude, currency)
+  const text = formatMoney(Math.abs(validation.difference), currency)
 
   return (
     <span className="inline-flex items-center gap-1 text-xs font-medium text-warning">
