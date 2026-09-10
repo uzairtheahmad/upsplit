@@ -9,9 +9,15 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Everything except static assets and image files — those never need a
-     * session refresh, and running middleware on them is pure latency.
+     * Everything except:
+     *  - build output and optimised images, which never need a session
+     *  - the generated metadata routes (opengraph-image, icon, apple-icon)
+     *    and the crawler files. These have no file extension, so without
+     *    naming them they get treated as app routes and redirected to /login
+     *    — which means crawlers fetch a sign-in page instead of the share
+     *    image, and browsers get no favicon.
+     *  - anything with an image extension
      */
-    '/((?!_next/static|_next/image|favicon.ico|.*\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
+    '/((?!_next/static|_next/image|favicon\.ico|opengraph-image|twitter-image|icon|apple-icon|sitemap\.xml|robots\.txt|manifest\.webmanifest|.*\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
   ],
 }

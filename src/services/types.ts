@@ -174,6 +174,14 @@ export interface ProfileService {
   deleteAccount(): Promise<void>
 }
 
+export interface DemoService {
+  /**
+   * Builds this visitor's own demo workspace and returns the group to land on.
+   * Idempotent — calling it twice returns the group already built.
+   */
+  start(): Promise<string>
+}
+
 export interface DataServices {
   groups: GroupService
   members: MemberService
@@ -184,4 +192,5 @@ export interface DataServices {
   settlements: SettlementService
   notifications: NotificationService
   profile: ProfileService
+  demo: DemoService
 }

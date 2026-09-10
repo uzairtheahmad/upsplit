@@ -684,4 +684,15 @@ export const supabaseServices: DataServices = {
       if (error) throw new Error(error.message)
     },
   },
+
+  demo: {
+    async start() {
+      // Each visitor gets their own group, so exploring the demo cannot
+      // disturb anyone else's and nothing needs resetting on a schedule.
+      const { data, error } = await db().rpc('start_demo')
+      if (error) throw new Error(error.message)
+      await refreshWorkspace()
+      return data as string
+    },
+  },
 }

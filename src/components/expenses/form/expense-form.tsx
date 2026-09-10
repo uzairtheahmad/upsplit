@@ -220,7 +220,7 @@ export function ExpenseForm({
         </p>
       ) : null}
 
-      <Field label="Notes" htmlFor="expense-notes" hint="Optional — anything worth remembering later.">
+      <Field label="Notes" htmlFor="expense-notes" hint="Optional. Anything worth remembering later.">
         <Textarea
           id="expense-notes"
           value={form.state.notes}

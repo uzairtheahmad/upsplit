@@ -144,7 +144,7 @@ export function CreateGroupDialog({
                 id="group-description"
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
-                placeholder="Four days in Karimabad — hotel, fuel and food."
+                placeholder="Four days in Karimabad: hotel, fuel and food."
                 rows={2}
               />
             </Field>
@@ -319,7 +319,7 @@ export function InviteMemberDialog({
         // No account yet. The invitation is stored, and the signup trigger
         // turns it into membership the moment they register.
         toast.success('Invitation saved', {
-          description: `${result.email} needs to sign up first — they'll join this group automatically when they do.`,
+          description: `${result.email} needs to sign up first. They'll join this group automatically when they do.`,
           duration: 8000,
         })
       }

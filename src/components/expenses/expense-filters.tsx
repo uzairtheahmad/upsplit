@@ -109,7 +109,7 @@ export function applyExpenseFilters(
   }
 }
 
-export function countActiveFilters(filters: ExpenseFilterState): number {
+function countActiveFilters(filters: ExpenseFilterState): number {
   return (
     (filters.range !== 'all_time' ? 1 : 0) +
     filters.categories.length +

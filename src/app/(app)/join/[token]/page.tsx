@@ -61,7 +61,7 @@ export default function JoinGroupPage() {
           <p className="text-sm text-muted-foreground">{error}</p>
         </div>
         <p className="text-sm text-muted-foreground">
-          Ask whoever shared it for a fresh link — invite links can be rotated or revoked.
+          Ask whoever shared it for a fresh link. Invite links can be rotated or revoked.
         </p>
         <Button asChild variant="outline" size="sm">
           <Link href="/groups">Back to your groups</Link>

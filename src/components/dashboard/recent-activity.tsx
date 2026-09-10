@@ -49,7 +49,7 @@ function describe(event: ActivityEvent, actorName: string): string {
   }
 }
 
-export function ActivityItem({
+function ActivityItem({
   event,
   actor,
   group,

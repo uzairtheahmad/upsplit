@@ -24,7 +24,7 @@ function isLive<T extends { deletedAt?: string | null }>(record: T): boolean {
 }
 
 /** Signed entries for one expense. Sums to zero. */
-export function expenseLedgerEntries(expense: Expense): LedgerEntry[] {
+function expenseLedgerEntries(expense: Expense): LedgerEntry[] {
   return calculateExpenseImpact(expense)
     .filter((impact) => impact.net !== 0)
     .map((impact) => ({
@@ -42,7 +42,7 @@ export function expenseLedgerEntries(expense: Expense): LedgerEntry[] {
  * A settlement moves money from a debtor to a creditor, so it pushes both
  * balances toward zero: the payer's net rises, the receiver's falls.
  */
-export function settlementLedgerEntries(settlement: Settlement): LedgerEntry[] {
+function settlementLedgerEntries(settlement: Settlement): LedgerEntry[] {
   return [
     {
       userId: settlement.fromUserId,

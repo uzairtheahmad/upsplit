@@ -177,7 +177,7 @@ export function InviteLinkPanel({
               {link.expiresAt
                 ? `Expires ${formatDateLong(link.expiresAt.slice(0, 10))}.`
                 : 'Does not expire.'}{' '}
-              Rotating replaces it — the old link stops working immediately.
+              Rotating replaces it. The old link stops working immediately.
             </p>
           </>
         ) : (

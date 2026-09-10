@@ -20,7 +20,7 @@ import type { CurrencyCode, Group, SettlementSuggestion, Settlement, User } from
  * here may never have shared an expense directly — the copy says what the
  * payment achieves rather than implying a direct debt.
  */
-export function SettlementSuggestionCard({
+function SettlementSuggestionCard({
   suggestion,
   users,
   currency,

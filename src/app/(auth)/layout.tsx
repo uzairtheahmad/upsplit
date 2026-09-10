@@ -7,7 +7,7 @@ const HIGHLIGHTS = [
   {
     icon: Scale,
     title: 'Balances that explain themselves',
-    body: 'Every number opens into the expenses that produced it — no more “why do I owe this?”',
+    body: 'Every number opens into the expenses that produced it. No more “why do I owe this?”',
   },
   {
     icon: Sparkles,
@@ -17,7 +17,7 @@ const HIGHLIGHTS = [
   {
     icon: Users,
     title: 'Splits that match real life',
-    body: 'Equal, exact, percentage or shares — and the person who paid doesn’t have to be in the split.',
+    body: 'Equal or exact amounts, and the person who paid doesn’t have to be in the split.',
   },
 ]
 

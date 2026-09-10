@@ -469,7 +469,7 @@ function AccountSection() {
                     <li key={entry.group.id} className="flex items-center gap-1.5">
                       <span className="text-foreground">{entry.group.name}</span>
                       <span className="text-muted-foreground">
-                        — you {entry.myNet > 0 ? 'are owed' : 'owe'}{' '}
+                        · you {entry.myNet > 0 ? 'are owed' : 'owe'}{' '}
                         {formatMoney(Math.abs(entry.myNet), entry.group.currency)}
                       </span>
                     </li>
@@ -503,7 +503,7 @@ function AccountSection() {
             <p className="text-sm text-muted-foreground">
               You’ll be removed from every group and your name and photo will be erased.
               The expenses and settlements you recorded stay, because other people’s
-              balances depend on them — they’ll show as <em>Deleted user</em>.
+              balances depend on them. They’ll show as <em>Deleted user</em>.
             </p>
             <p className="text-sm text-muted-foreground">This cannot be undone.</p>
           </DialogBody>

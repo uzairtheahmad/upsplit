@@ -213,7 +213,7 @@ export default function GroupMembersPage() {
       </ul>
 
       <p className="text-xs text-muted-foreground">
-        Someone with an outstanding balance can’t be removed — settle up with them first, so the
+        Someone with an outstanding balance can’t be removed. Settle up with them first, so the
         group’s books stay balanced.
       </p>
 

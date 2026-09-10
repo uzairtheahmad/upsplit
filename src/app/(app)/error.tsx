@@ -24,7 +24,7 @@ export default function AppError({
     <PageContainer>
       <ErrorState
         title="This screen didn’t load"
-        description="Something went wrong on our side. Your data is safe — try again, or head back to the dashboard."
+        description="Something went wrong on our side. Your data is safe. Try again, or head back to the dashboard."
         action={
           <div className="flex gap-2">
             <Button variant="outline" asChild>

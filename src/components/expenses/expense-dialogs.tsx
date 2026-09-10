@@ -40,7 +40,7 @@ export function AddExpenseDialog({
         <DialogHeader>
           <DialogTitle>Add an expense</DialogTitle>
           <DialogDescription>
-            Choose who paid and who it’s split between — the preview updates as you type.
+            Choose who paid and who it’s split between. The preview updates as you type.
           </DialogDescription>
         </DialogHeader>
         <DialogBody>

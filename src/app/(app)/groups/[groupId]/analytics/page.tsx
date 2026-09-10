@@ -133,7 +133,7 @@ export default function GroupAnalyticsPage() {
               })}
             </ul>
             <p className="mt-4 text-xs text-muted-foreground">
-              This ranks what people <em>paid</em>, not what they consumed — see Balances for the
+              This ranks what people <em>paid</em>, not what they consumed. See Balances for the
               net position.
             </p>
           </CardContent>

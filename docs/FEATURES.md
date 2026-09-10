@@ -99,6 +99,7 @@ is a courtesy to the user and the database's is the actual rule.
 | ✅ **Transfer group ownership** | "Make owner" in the member menu, owner-only. One statement, because the single-owner index forbids two owners existing even momentarily — the previous owner becomes an admin. |
 | ✅ **Avatar uploads** | Settings → Profile. Writes to `avatars/<user-id>/…`; the storage policy only permits writes inside a folder named after your own id, so the path *is* the check. 2 MB cap, images only. |
 | ✅ **Account deletion** | Anonymises: memberships dropped, name and photo scrubbed, expenses and settlements left intact so nobody else's balances move. Refuses while any balance is outstanding or a group you own still has other people in it. Signs you out afterwards. |
+| ✅ **One-click demo** | The landing page signs a visitor in anonymously and calls `start_demo()`, which builds them their **own** group seeded with the souvenirs example, an exact split and a two-payer expense. Per-visitor, so nobody can spoil it for anyone else and there is nothing to reset. A dismissible banner offers a real account. Requires Anonymous Sign-Ins enabled in Supabase. |
 | ⏸ **Real email** | `email_outbox` fills correctly; no worker drains it yet. Waiting on a provider. In-app notifications are unaffected. |
 
 ## 6. Excluded

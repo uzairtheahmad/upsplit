@@ -96,8 +96,8 @@ export function ParticipantSelector({
           <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden />
           <span>
             {nonParticipatingPayers.length === 1
-              ? `${nameFor(members, nonParticipatingPayers[0], currentUserId)} paid but isn’t in the split — they’ll be owed the full amount.`
-              : 'Some payers aren’t in the split — they’ll be owed the full amount.'}
+              ? `${nameFor(members, nonParticipatingPayers[0], currentUserId)} paid but isn’t in the split, so they’ll be owed the full amount.`
+              : 'Some payers aren’t in the split, so they’ll be owed the full amount.'}
           </span>
         </p>
       ) : null}

@@ -28,7 +28,7 @@ import type { Balance, CurrencyCode, Expense, Money, Settlement, User } from '@/
  * The direction is stated in a sentence — "Ali owes you" / "You owe Shaheer" —
  * so the meaning never depends on the colour of the number.
  */
-export function PersonBalanceCard({
+function PersonBalanceCard({
   person,
   amount,
   currency,
@@ -322,7 +322,7 @@ export function GroupBalanceTable({
                   {formatMoney(balance.owed, currency)}
                 </td>
                 <td className="tabular px-4 py-2.5 text-right text-muted-foreground">
-                  {balance.settled === 0 ? '—' : formatMoney(balance.settled, currency, { signed: true })}
+                  {balance.settled === 0 ? '-' : formatMoney(balance.settled, currency, { signed: true })}
                 </td>
                 <td className="px-4 py-2.5 text-right">
                   <Amount value={balance.net} currency={currency} size="sm" tone="auto" signed />

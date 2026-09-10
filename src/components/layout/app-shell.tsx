@@ -7,9 +7,11 @@ import * as React from 'react'
 
 import { useAppActions } from '@/components/layout/app-actions'
 import { BrandLockup } from '@/components/layout/brand'
+import { DemoBanner } from '@/components/layout/demo-banner'
 import { DesktopSidebar, SidebarContent } from '@/components/layout/sidebar'
 import { UserMenu } from '@/components/layout/user-menu'
 import { NotificationBell } from '@/components/notifications/notification-bell'
+import { ThemeToggle } from '@/components/layout/theme-toggle'
 import { PageLoader } from '@/components/shared/states'
 import { Button } from '@/components/ui/button'
 import {
@@ -126,6 +128,8 @@ function AppHeader() {
           </Link>
         </Button>
 
+        <ThemeToggle />
+
         <NotificationBell />
 
         <Button size="sm" className="hidden lg:inline-flex" onClick={() => actions.addExpense()}>
@@ -180,6 +184,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-dvh">
+      <DemoBanner />
       <DesktopSidebar />
       <div className="lg:pl-64">
         <AppHeader />
